@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from drumchotic.chart import parse_chart, parse_mid
+from drumchotic.chart import ini, parse_chart, parse_mid
 from drumchotic.chart.model import Dynamic, Pad, TrackType
 from tests.fixtures import note, text, write_chart, write_mid
 
@@ -108,6 +108,20 @@ class ChartTests(unittest.TestCase):
     def test_no_expert_section(self):
         self.path.write_text('[Song]\n{\n  Resolution = 192\n}\n')
         self.assertIsNone(parse_chart.load(self.path))
+
+
+class IniTests(unittest.TestCase):
+    def read(self, data):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'song.ini'
+            path.write_bytes(data)
+            return ini.read(path)
+
+    def test_utf8(self):
+        self.assertEqual(self.read('[song]\nname = Szamár Madár\n'.encode('utf-8'))['name'], 'Szamár Madár')
+
+    def test_windows_1252_fallback(self):
+        self.assertEqual(self.read('[song]\nname = Szamár Madár\n'.encode('cp1252'))['name'], 'Szamár Madár')
 
 
 if __name__ == '__main__':
