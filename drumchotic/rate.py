@@ -11,6 +11,8 @@ WHAT TO RATE (combine as many as you like, each gets its own block)
   --artist NAME [NAME ...]  each artist's charts from the library
   --search TEXT             library charts whose artist or title contains TEXT
   --top N                   the N hardest charts in the library
+  --tournament [NAME ...]   DMT tournaments with the tier each song was placed in, and how well
+                            the model agrees with that order. No name: every tournament.
   "The library" means every chart drumchotic already knows: leaderboard songs and tournament
   setlists. Matching ignores case and works on whole words ("dahlia" finds "The Black Dahlia
   Murder", "dahl" doesn't).
@@ -53,6 +55,7 @@ EXAMPLES
   scripts/rate.sh ~/"Clone Hero/Songs"
   scripts/rate.sh ~/Downloads/new-charts --limit 20
   scripts/rate.sh --artist "black dahlia murder" "hail the sun" --limit 15
+  scripts/rate.sh --tournament "icebreaker 2024" "summer blast"
   scripts/rate.sh --top 25 --detail
 """
 import argparse
@@ -63,6 +66,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+from scipy.stats import spearmanr
 
 from .chart import song
 from .measure import features
@@ -91,7 +95,7 @@ def chart_rows(rater, rated, limit, detail):
     for i, (title, folder, res) in enumerate(shown, 1):
         rated_as = charter_rating(folder)
         why = ', '.join(a for a, _, _ in reasons(res)[:REASONS_SHOWN])
-        placed = sorted(rater.placed.get(song.md5(folder), ()))
+        placed = [res['tier']] if 'tier' in res else sorted(rater.placed.get(song.md5(folder), ()))
         tier = 'T' + '/'.join(map(str, placed)) if placed else ''
         lines.append(f"  {i:3d}  {res['level']:4.1f}  {res['charter']:4.1f} │ {tier:>4}  {rated_as if rated_as >= 0 else '':>4}"
                      f"  {fit(title, width):{width}}  {why}".rstrip())
@@ -124,12 +128,13 @@ def group(rater, name, rated, limit, detail):
     return [head, '=' * len(head)] + summary(rated) + [''] + chart_rows(rater, rated, limit, detail) + ['', '']
 
 
-def library_row(rater, m, title=None):
-    """(title, folder, rating) for a library chart, 'artist - name' unless given a title."""
+def library_row(rater, m, title=None, **extra):
+    """(title, folder, rating) for a library chart, 'artist - name' unless given a title.
+    extra goes into the rating, e.g. the tournament tier."""
     r = rater.r
     if title is None:
         title = ' - '.join(library_title(r, m))
-    return title, r.library[m]['folder'], rater.rate(r.features[m])
+    return title, r.library[m]['folder'], {**rater.rate(r.features[m]), **extra}
 
 
 def hardest_first(rated):
@@ -174,6 +179,29 @@ def by_top(rater, n, detail):
     return group(rater, f'hardest {n} charts', [library_row(rater, m) for m in hardest], None, detail)
 
 
+def by_tournament(rater, names, limit, detail):
+    """Each DMT tournament (and its sudden death set) rated, with the tier it was placed in."""
+    r = rater.r
+    groups = collections.defaultdict(list)
+    for lab, m in r.labels:
+        if m in r.features and (not names or any(n.lower() in lab.group.lower() for n in names)):
+            groups[lab.group].append((lab.tier, m))
+    if not groups:
+        return [f'no tournament matching {" or ".join(names)}', '']
+    out = []
+    for name in sorted(groups):
+        rated = hardest_first(library_row(rater, m, tier=t) for t, m in groups[name])
+        block = group(rater, name, rated, limit, detail)
+        tiers = sorted({t for t, _ in groups[name]})
+        held = {t: [res['level'] for _, _, res in rated if res['tier'] == t] for t in tiers}
+        rho = spearmanr([t for t, _ in groups[name]], [r.tier_pred.get(m, np.nan) for _, m in groups[name]],
+                        nan_policy='omit')[0]
+        extra = [f'matches the human tier order: {rho:.2f} (spearman, from a model fit without any tournament chart)',
+                 'drumchotic median tier per human tier: ' + '   '.join(f'T{t} {np.median(held[t]):.1f}' for t in tiers)]
+        out += block[:3] + extra + block[3:]
+    return out
+
+
 def by_folder(rater, root, limit, detail):
     rated, notes, online_only = [], [], 0
     for folder in chart_folders(root):
@@ -213,6 +241,7 @@ LEGEND = [
 
 def report_path(a):
     names = (([f'top {a.top}'] if a.top else [])
+             + ((a.tournament or ['tournaments']) if a.tournament is not None else [])
              + (a.artist or []) + ([a.search] if a.search else [])
              + [Path(f).name for f in a.folders])
     slug = re.sub(r'[^a-z0-9]+', '-', ' '.join(names).lower()).strip('-')[:60] or 'ratings'
@@ -226,13 +255,14 @@ def main():
     p.add_argument('--artist', nargs='+', metavar='NAME', help="each artist's library charts")
     p.add_argument('--search', metavar='TEXT', help='library charts whose artist or title matches')
     p.add_argument('--top', type=int, metavar='N', help='the N hardest library charts')
+    p.add_argument('--tournament', nargs='*', metavar='NAME', help='DMT tournaments with their tiers (no name: all)')
     p.add_argument('--limit', type=int, metavar='N', help='show only the N hardest of each block')
     p.add_argument('--detail', action='store_true', help='list every axis under each chart, not just stand-outs')
     p.add_argument('--out', type=Path, metavar='FILE', help='save the report here instead of data/ratings/')
     a = p.parse_args()
-    if not (a.folders or a.artist or a.search or a.top):
+    if not (a.folders or a.artist or a.search or a.top or a.tournament is not None):
         p.print_usage()
-        p.exit(2, 'nothing to rate: give a folder or one of --artist, --search, --top '
+        p.exit(2, 'nothing to rate: give a folder or one of --artist, --search, --top, --tournament '
                   '(--help explains everything)\n')
     caller = Path(os.environ.get('RATE_CWD', '.'))
     a.folders = [caller / f for f in a.folders]
@@ -241,6 +271,8 @@ def main():
     lines = []
     if a.top:
         lines += by_top(rater, a.top, a.detail)
+    if a.tournament is not None:
+        lines += by_tournament(rater, a.tournament, a.limit, a.detail)
     if a.artist:
         lines += by_artist(rater, a.artist, a.limit, a.detail)
     if a.search:
