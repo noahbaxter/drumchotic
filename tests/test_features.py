@@ -58,12 +58,47 @@ class EnduranceTests(unittest.TestCase):
         self.assertEqual(features.longest_stretch(dur, [True, True, True, True], [False, True, False, True]), 2.0)
 
 
+class LinearTests(unittest.TestCase):
+    def test_hihat_riding_on_the_kicks_does_not_break_linear(self):
+        plain, layered = [], []
+        step = SIXTEENTH // 2       # 62.5 ms, inside LINEAR_MS
+        for i in range(32):
+            pad = Pad.KICK if i % 2 == 0 else Pad.RED
+            plain.append(hit(i * step, pad))
+            layered.append(hit(i * step, pad))
+            if i % 3 == 0:
+                layered.append(hit(i * step, Pad.YELLOW, cymbal=True))
+        a, b = features.compute(chart(plain)), features.compute(chart(layered))
+        self.assertGreater(a['linear_w1'], 0)
+        self.assertEqual(a['linear_w1'], b['linear_w1'])
+
+
+def linear_16ths(order, bars):
+    """16ths, one limb per note, cycling through order ('K' kick, 'S' snare)."""
+    pads = {'K': Pad.KICK, 'S': Pad.RED}
+    return [hit(i * SIXTEENTH, pads[order[i % len(order)]]) for i in range(bars * 16)]
+
+
 class LimbTests(unittest.TestCase):
     def test_a_fill_is_a_hand_burst_but_not_hand_stamina(self):
         fill = [hit(4 * 4 * RES + i * SIXTEENTH // 2, Pad.RED) for i in range(8)]
         a, b = features.compute(chart(groove(0, 8))), features.compute(chart(groove(0, 8) + fill))
         self.assertGreater(b['run8_hands'], a['run8_hands'])
         self.assertAlmostEqual(b['run64_hands'], a['run64_hands'], delta=0.5)
+
+    def test_offbeat_kicks_and_hands_together_raise_coordination(self):
+        on = groove(0, 8)
+        off = on + [hit(b * 4 * RES + RES * 3 // 4, p) for b in range(8) for p in (Pad.KICK, Pad.BLUE)]
+        a, b = features.compute(chart(on)), features.compute(chart(off))
+        self.assertEqual(a['coord_offbeat_w4'], 0)
+        self.assertGreater(b['coord_offbeat_w4'], 0)
+
+
+class LimbOrderTests(unittest.TestCase):
+    def test_irregular_limb_order_is_more_novel_than_a_repeating_one(self):
+        steady = features.compute(chart(linear_16ths('KSSS', 8)))
+        irregular = features.compute(chart(linear_16ths('KSSKSKSSSKKSKSSSKSKKSSSKSSKSKSSS', 8)))
+        self.assertGreater(irregular['limb_novel_w4'], steady['limb_novel_w4'])
 
 
 if __name__ == '__main__':

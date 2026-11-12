@@ -51,8 +51,13 @@ SUSTAINED_WINDOW_S = 30
 ENDURANCE_NPS = (8, 10, 12)
 # A hand move counts fully as travel when the gap is shorter than this (ms).
 TRAVEL_CLOSE_MS = 250.0
+# Kick-only and drum-only onsets alternating faster than this (ms) count as linear playing.
+LINEAR_MS = 100
 # How many onsets back a pattern has to be seen before it stops counting as new (variety).
 NOVEL_HISTORY = 32
+# Variety also counts new limb orders (kick / left / right, from the sticking): this many
+# onsets make up one pattern of limbs.
+LIMB_GRAM = 6
 # How much a note inside a repeating pattern counts toward density, travel and cymbal
 # switching (1 = same as a new pattern). Grooves you lock into are easier to sustain than
 # the same density of changing material. Raw speed (fastest runs) is never discounted.

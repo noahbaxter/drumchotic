@@ -13,10 +13,10 @@ import numpy as np
 from . import sticking
 from ..chart.model import Pad
 from ..chart.tempo import TempoMap
-from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, NOVEL_HISTORY, REPEAT_WEIGHT, RUNS,
-                      SPEED_WINDOW_S, SUSTAINED_WINDOW_S, TRAVEL_CLOSE_MS, WINDOWS_S)
+from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, LIMB_GRAM, LINEAR_MS, NOVEL_HISTORY,
+                      REPEAT_WEIGHT, RUNS, SPEED_WINDOW_S, SUSTAINED_WINDOW_S, TRAVEL_CLOSE_MS, WINDOWS_S)
 from .playable import playable
-from .timing import fastest_run, worst_window
+from .timing import fastest_run, window_sums_at, worst_window
 
 
 @dataclass
@@ -100,6 +100,10 @@ def compute(chart):
     f.update(kicks(o, chart.resolution))
     f.update(hands(o, strokes, chart.resolution))
     f.update(hand_movement(strokes, dict(zip(o.t, o.weight))))
+    f.update(linear(o))
+    f.update(limb_order(o, strokes))
+    f.update(coordination(o, chart.resolution))
+    f.update(variety_and_dynamics(o))
     f.update({
         'length_s': max((o.t[-1] - o.t[0]) / 1000.0, 1.0),
         'notes': len(chart.hits),     # every note counts toward percent, roll lanes or not
@@ -246,4 +250,84 @@ def hand_movement(strokes, weight_at):
         f[f'sticking_w{w}'] = worst_window(st, cost, w)
         f[f'travel_w{w}'] = worst_window(t, dist, w)
         f[f'cymswitch_w{w}'] = worst_window(t, switch, w)
+    return f
+
+
+def has_drum(o):
+    """Onsets with a hand on a drum (snare or tom), cymbals aside."""
+    return np.array([any(not sticking.CYMBAL[s] for s in surfs) for surfs in o.surfaces])
+
+
+def linear_series(o):
+    """1 where a kick with no drum follows a drum hit with no kick (or the reverse) within
+    LINEAR_MS. A cymbal riding on top doesn't break it."""
+    drum = has_drum(o)
+    k, d = o.has_kick & ~drum, drum & ~o.has_kick
+    alternates = (d[1:] & k[:-1]) | (k[1:] & d[:-1])
+    return np.r_[0.0, (alternates & (np.diff(o.t) <= LINEAR_MS)).astype(float)]
+
+
+def linear(o):
+    series = linear_series(o)
+    return {f'linear_w{w}': worst_window(o.t, series, w) for w in WINDOWS_S}
+
+
+def limb_order(o, strokes):
+    """New limb orders per second, and the same counting only onsets played by a single limb
+    (linear-style)."""
+    novel, single = limb_order_series(o, strokes, with_single=True)
+    f = {}
+    for w in WINDOWS_S:
+        f[f'limb_novel_w{w}'] = worst_window(o.t, novel, w)
+        f[f'limb_novel_single_w{w}'] = worst_window(o.t, novel * single, w)
+    return f
+
+
+def limb_order_series(o, strokes, with_single=False):
+    """1 per onset whose limb order is new: each onset is the limbs on it (kick, left, right, from
+    the sticking) and its gap; it's new when the LIMB_GRAM onsets ending on it weren't played in
+    the last NOVEL_HISTORY onsets. with_single also returns 1 where a single limb plays."""
+    hands_at = collections.defaultdict(set)
+    for s in strokes:
+        hands_at[s.time_ms].add(s.hand)
+    tokens = [(bool(k), tuple(sorted(hands_at.get(t, ()))), int(g))
+              for t, k, g in zip(o.t, o.has_kick, gap_tokens(o.t))]
+    novel = _new_grams(tokens, LIMB_GRAM)
+    if not with_single:
+        return novel
+    return novel, np.array([int(k) + len(h) == 1 for k, h, _ in tokens], float)
+
+
+def coordination_series(o, res, window_s):
+    """Per window starting at each onset: the lesser of the kick and hand rates (per second) of
+    notes off the 8th grid, and of rhythms not heard recently. {'offbeat': array, 'novel': array}"""
+    off = off_grid(o.ticks, res)
+    series = {}
+    for name, sel in (('kick', o.has_kick), ('hands', o.has_hand)):
+        t = o.t[sel]
+        series[name] = (t, off[sel], _new_grams(list(gap_tokens(t))))
+    out = {}
+    for i, kind in enumerate(('offbeat', 'novel')):
+        k = window_sums_at(o.t, series['kick'][0], series['kick'][1 + i], window_s)
+        h = window_sums_at(o.t, series['hands'][0], series['hands'][1 + i], window_s)
+        out[kind] = np.minimum(k, h)
+    return out
+
+
+def coordination(o, res):
+    """Feet and hands syncopated at the same time, at any tempo: the densest window of both
+    limbs off the 8th grid, and of both playing rhythms not heard recently."""
+    f = {}
+    for w in WINDOWS_S:
+        for kind, v in coordination_series(o, res, w).items():
+            f[f'coord_{kind}_w{w}'] = float(v.max()) if len(v) else 0.0
+    return f
+
+
+def variety_and_dynamics(o):
+    """New patterns per second, and accented/ghosted hand notes per second."""
+    f = {}
+    for w in WINDOWS_S:
+        f[f'novel_w{w}'] = worst_window(o.t, o.novel, w)
+        f[f'dynamics_w{w}'] = worst_window(o.t, o.dynamics, w)
     return f
