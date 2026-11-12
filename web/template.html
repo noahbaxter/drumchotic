@@ -66,6 +66,13 @@
   .seg button:hover { color: var(--ink); }
   .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .more { color: var(--ink-3); padding: 10px 8px; }
+  #tourn { overflow-x: auto; }
+  #tourn table { width: auto; }
+  #tourn th { position: static; cursor: default; text-align: center; min-width: 52px; }
+  #tourn th:first-child, #tourn td:first-child { text-align: left; min-width: 240px; }
+  #tourn td { text-align: center; font-weight: 600; }
+  #tourn td.empty { color: var(--grid); font-weight: 400; }
+  .tag { color: var(--ink-3); font-size: 11px; font-weight: 400; margin-left: 8px; }
   @media (max-width: 600px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .bar { padding: 10px 16px; } #q { width: 100%; } }
 </style>
 </head>
@@ -87,6 +94,7 @@
 <main>
   <section class="panel"><h2><span class="seg" id="scale"><button data-v="d">diff</button><button data-v="lv">tier</button></span> <span>drumchotic's, filtered charts over the grey shape of the whole library</span></h2><svg id="hist"></svg></section>
   <section class="panel"><h2>Model vs leaderboard <span id="sp"></span></h2><canvas id="scatter"></canvas></section>
+  <section class="panel wide"><h2>Tournaments <span>median drumchotic tier of each human tier; only 2024 on sets the tier scale</span></h2><div id="tourn"></div></section>
   <section class="panel wide"><h2>What makes charts hard <span>median and middle half of each axis's share, white tick = whole library median</span></h2><svg id="axes"></svg></section>
   <section class="panel wide"><h2>Charts <span id="tcount"></span></h2>
     <div class="spot"><span class="lbl">spot check</span><span class="seg" id="spotseg"></span><span id="thinval"></span>
@@ -286,6 +294,40 @@ $('scatter').addEventListener('mousemove', e => {
 });
 $('scatter').addEventListener('mouseleave', hideTip);
 
+// tournaments: one column each, a dot per human tier at its median drumchotic tier
+const LADDER_FROM = 2024;   // as sources/dmt.py: older tournaments numbered tiers their own way
+const yearOf = g => +(g.match(/\b(20\d\d)\b/) || [0, 0])[1];
+function drawTournaments() {
+  const groups = new Map();
+  for (const c of ALL) for (const [g, t] of c.tn) {
+    if (!groups.has(g)) groups.set(g, new Map());
+    const tiers = groups.get(g); if (!tiers.has(t)) tiers.set(t, []); tiers.get(t).push(c);
+  }
+  // newest first, so the tournaments that set the scale lead
+  const names = [...groups.keys()].sort((a, b) => yearOf(b) - yearOf(a) || a.localeCompare(b));
+  const top = Math.max(...names.flatMap(g => [...groups.get(g).keys()]));
+  const tiers = Array.from({length: top}, (_, i) => i + 1);
+  const cells = new Map();
+  const head = '<tr><th>tournament</th>' + tiers.map(t => `<th>T${t}</th>`).join('') + '</tr>';
+  const body = names.map(g => {
+    const tag = yearOf(g) < LADDER_FROM ? '<span class="tag">older numbering</span>' : '';
+    return `<tr><td>${esc(g.replace(' Setlist', ''))}${tag}</td>` + tiers.map(t => {
+      const cs = groups.get(g).get(t);
+      if (!cs) return '<td class="empty">·</td>';
+      const v = median(cs.map(c => c.lv)), id = cells.size;
+      cells.set(id, {g, t, v, cs});
+      return `<td data-c="${id}" style="color:${levelColor(v)}">${v.toFixed(1)}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+  $('tourn').innerHTML = `<table>${head}${body}</table>`;
+  $('tourn').querySelectorAll('td[data-c]').forEach(td => {
+    const {g, t, v, cs} = cells.get(+td.dataset.c);
+    const top3 = [...cs].sort((p, q) => q.n - p.n).slice(0, 3).map(c => `<br>${esc(c.name)} <span class="m">tier ${c.lv.toFixed(1)}</span>`).join('');
+    td.addEventListener('mousemove', e => showTip(e, `<b>${esc(g)}, T${t}</b> <span class="m">median tier ${v.toFixed(1)}, ${cs.length} songs, most played:</span>${top3}`));
+    td.addEventListener('mouseleave', hideTip);
+  });
+}
+
 // axis shares
 function drawAxes(sel) {
   const svg = $('axes'), W = svg.clientWidth || 900, row = 26, m = {l: 150, r: 60, t: 6, b: 30};
@@ -384,7 +426,7 @@ let current = ALL;
 function update() {
   try { localStorage.setItem('drumchotic-filters', JSON.stringify(Object.fromEntries(CONTROLS.map(k => [k, $(k).value])))); } catch (e) {}
   current = filtered();
-  drawHist(current); drawScatter(current); drawAxes(current); drawTable(current);
+  drawHist(current); drawScatter(current); drawTournaments(); drawAxes(current); drawTable(current);
 }
 addEventListener('resize', () => update());
 update();
