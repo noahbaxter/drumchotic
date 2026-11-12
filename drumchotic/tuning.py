@@ -34,8 +34,10 @@ LEFT_CRASH = True
 # ---- FEATURES: what gets measured from a chart (drumchotic/measure/features.py)
 # Sliding windows (seconds): 1 = burst, 4 = section, 16 = sustained.
 WINDOWS_S = (1, 4, 16)
-# "Fastest run of N notes" lengths for kicks, both hands and one hand.
+# "Fastest run of N notes" lengths for kicks, both hands and one hand: up to BURST_MAX is a
+# burst, longer is stamina.
 RUNS = (4, 8, 16, 32, 64)
+BURST_MAX = 8
 # Speed: the most notes (chords count each note) in any window this long.
 SPEED_WINDOW_S = 1
 # Density: notes/s per chunk of this many quarter notes. A fixed tick span, so 3/16 and 13/4
@@ -68,3 +70,62 @@ ROLL_MODE = 'half'
 # 2x kick notes are opt-in (Expert+). '2x' counts them, as if played on a double pedal;
 # '1x' drops them, as if played on Expert with one pedal.
 KICK_MODE = '2x'
+
+# ---- COMBINE: how axis scores become one difficulty (drumchotic/fit/axes.py)
+# How axes add up. 1 = plain sum (being decent at everything adds up).
+# Higher = the hardest axis dominates (2 ~ moderate, 4+ ~ close to "only the worst axis counts").
+# 2: difficulty is the length of the chart's axis vector, so being hard two ways adds up.
+# Powers 1 to 3 all fit the leaderboard equally well; this one is a judgement call.
+AXIS_POWER = 2.0
+# Manual multiplier on each axis after the fit. 1 = trust the data; raise to make an axis
+# matter more than the scores say, 0 to switch it off. Applied before AXIS_POWER.
+# Axes not listed stay at 1, e.g. {'kick stamina': 1.5}.
+AXIS_SCALE = {}
+# Which features feed each axis.
+AXES = {
+    'speed': ['max_nps'],
+    'density': [f'density_p{int(q * 100)}' for q in DENSITY_QUANTILES] + [f'density_w{SUSTAINED_WINDOW_S}'],
+    'endurance': [f'endurance_{k}_n{n}' for k in ('share', 'longest') for n in ENDURANCE_NPS],
+}
+# Kicks, both hands and one hand each get a burst (short runs, densest second), stamina (long
+# runs, densest 4s and 16s) and syncopation (off the 8th grid, new rhythms) axis.
+for _limb, _label in (('kick', 'kick'), ('hands', 'hand'), ('onehand', 'one hand')):
+    AXES[f'{_label} burst'] = ([f'run{n}_{_limb}' for n in RUNS if n <= BURST_MAX]
+                               + [f'nps_{_limb}_w{w}' for w in WINDOWS_S if w <= 1])
+    AXES[f'{_label} stamina'] = ([f'run{n}_{_limb}' for n in RUNS if n > BURST_MAX]
+                                 + [f'nps_{_limb}_w{w}' for w in WINDOWS_S if w > 1])
+    AXES[f'{_label} syncopation'] = [f'{_limb}_{k}_w{w}' for k in ('offbeat', 'novel') for w in WINDOWS_S]
+AXES['kick syncopation'] += [f'kick_alone_w{w}' for w in WINDOWS_S]
+AXES.update({
+    # kit distance moved and cymbal/drum switches: they move together, so one axis
+    'movement': [f'{k}_w{w}' for k in ('travel', 'cymswitch') for w in WINDOWS_S],
+    'sticking': [f'sticking_w{w}' for w in WINDOWS_S],
+    'linear': [f'linear_w{w}' for w in WINDOWS_S],
+    # feet and hands both syncopated at the same moment
+    'coordination': [f'coord_{k}_w{w}' for k in ('offbeat', 'novel') for w in WINDOWS_S],
+    # new pad patterns, new limb orders, and new limb orders played one limb at a time
+    'variety': [f'{k}_w{w}' for k in ('novel', 'limb_novel', 'limb_novel_single') for w in WINDOWS_S],
+})
+# Accents and ghosts only add bonus score: a hit with the wrong dynamic still counts, so they
+# never change percent. True rates charts for score chasing and adds the dynamics axis.
+DYNAMICS = False
+if DYNAMICS:
+    AXES['dynamics'] = ['dynamics_w1', 'dynamics_w4', 'dynamics_w16']
+# Each feature can bend upward above these quantiles (lets the extreme end climb faster).
+KNOTS = (0.5, 0.75, 0.9)
+# Shrinks axis weights toward 0; keeps near-duplicate features from fighting.
+RIDGE = 1e-3
+# Charts need this many leaderboard scores to be used as training targets.
+MIN_SCORES = 5
+# ...and this many notes: on tiny charts one miss swings the percent too far.
+MIN_NOTES = 200
+
+# ---- PLAYERS: the leaderboard fit that produces training targets (drumchotic/fit/players.py)
+# Pull on chart and player terms toward 0 (bigger = more cautious with few scores).
+PRIOR = 1.0
+# Scores this many deviations worse than expected get downweighted (bad runs, wrong difficulty).
+ROBUST = 1.5
+# Scores under this percent are ignored outright: quits, wrong difficulty, single pedal on 2x.
+MIN_PERCENT = 70
+# Tournament finishes relative to leaderboard scores. A nudge, not ground truth.
+T_WEIGHT = 5.0
