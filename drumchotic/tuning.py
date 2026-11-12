@@ -115,6 +115,10 @@ if DYNAMICS:
 KNOTS = (0.5, 0.75, 0.9)
 # Shrinks axis weights toward 0; keeps near-duplicate features from fighting.
 RIDGE = 1e-3
+# Charts need this many leaderboard scores to be used as training targets.
+MIN_SCORES = 5
+# ...and this many notes: on tiny charts one miss swings the percent too far.
+MIN_NOTES = 200
 
 # ---- PLAYERS: the leaderboard fit that produces training targets (drumchotic/fit/players.py)
 # Pull on chart and player terms toward 0 (bigger = more cautious with few scores).
