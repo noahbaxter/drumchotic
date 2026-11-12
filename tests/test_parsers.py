@@ -2,11 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from drumchotic.chart import parse_mid
+from drumchotic.chart import parse_chart, parse_mid
 from drumchotic.chart.model import Dynamic, Pad, TrackType
-from tests.fixtures import note, text, write_mid
+from tests.fixtures import note, text, write_chart, write_mid
 
 Q = 480  # .mid quarter note
+CQ = 192  # .chart quarter note
 
 
 def pads(chart):
@@ -69,6 +70,44 @@ class MidTests(unittest.TestCase):
         write_mid(self.path, [])
         self.path.write_bytes(self.path.read_bytes().replace(b'PART DRUMS', b'PART BASS!'))
         self.assertIsNone(parse_mid.load(self.path))
+
+
+class ChartTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / 'notes.chart'
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def load(self, lines, ini=None, **kw):
+        write_chart(self.path, lines, **kw)
+        return parse_chart.load(self.path, ini)
+
+    def test_hands_default_to_toms_unless_cymbal_marked(self):
+        chart = self.load(['0 = N 2 0', '0 = N 66 0', f'{CQ} = N 2 0', f'{2 * CQ} = N 4 0'])
+        self.assertEqual(pads(chart), [(0, Pad.YELLOW, True), (CQ, Pad.YELLOW, False), (2 * CQ, Pad.GREEN, False)])
+        self.assertTrue(chart.pro_marked)
+
+    def test_times_kick2x_and_dynamics(self):
+        chart = self.load(['0 = N 0 0', f'{CQ} = N 32 0', f'{CQ} = N 1 0', f'{CQ} = N 34 0', f'{2 * CQ} = N 3 0',
+                           f'{2 * CQ} = N 42 0'])
+        self.assertEqual([round(h.time_ms) for h in chart.hits], [0, 500, 500, 1000])
+        self.assertEqual([h.kick2x for h in chart.kicks], [False, True])
+        self.assertEqual([h.dynamic for h in chart.hands], [Dynamic.ACCENT, Dynamic.GHOST])
+
+    def test_roll_phrases_not_fills(self):
+        chart = self.load(['0 = N 1 0', '0 = S 64 192', '0 = S 65 192', f'{CQ} = S 66 192'])
+        self.assertEqual([r.kind for r in chart.rolls], ['roll1', 'roll2'])
+
+    def test_five_lane(self):
+        chart = self.load(['0 = N 5 0', f'{CQ} = N 2 0'])
+        self.assertEqual(chart.track_type, TrackType.FIVE_LANE)
+        self.assertEqual(pads(chart), [(0, Pad.GREEN, False), (CQ, Pad.YELLOW, True)])
+
+    def test_no_expert_section(self):
+        self.path.write_text('[Song]\n{\n  Resolution = 192\n}\n')
+        self.assertIsNone(parse_chart.load(self.path))
 
 
 if __name__ == '__main__':

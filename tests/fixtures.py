@@ -54,3 +54,10 @@ def write_mid(path, drum_events, resolution=480, bpm=120.0, extra_tempos=()):
     drums = [(0, name('PART DRUMS'))] + drum_events
     header = b'MThd' + struct.pack('>IHHH', 6, 1, 2, resolution)
     path.write_bytes(header + _track(conductor) + _track(drums))
+
+
+def write_chart(path, drum_lines, resolution=192, bpm=120.0, extra=''):
+    path.write_text(
+        '[Song]\n{\n  Resolution = %d\n}\n'
+        '[SyncTrack]\n{\n  0 = TS 4\n  0 = B %d\n}\n'
+        '[ExpertDrums]\n{\n%s\n}\n%s' % (resolution, round(bpm * 1000), '\n'.join(drum_lines), extra))
