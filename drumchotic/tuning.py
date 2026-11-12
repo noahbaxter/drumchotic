@@ -111,6 +111,30 @@ AXES.update({
     # new pad patterns, new limb orders, and new limb orders played one limb at a time
     'variety': [f'{k}_w{w}' for k in ('novel', 'limb_novel', 'limb_novel_single') for w in WINDOWS_S],
 })
+# Which axes are on. False leaves it out of the model, the reasons and every report; everything
+# refits on the next run. One hand is off because it adds nothing measurable: without it
+# held-out Spearman 0.908 -> 0.907, tiers 0.936 -> 0.935.
+AXES_ON = {
+    'speed':                True,
+    'density':              True,
+    'endurance':            True,
+    'kick burst':           True,
+    'kick stamina':         True,
+    'kick syncopation':     True,
+    'hand burst':           True,
+    'hand stamina':         True,
+    'hand syncopation':     True,
+    'one hand burst':       False,
+    'one hand stamina':     False,
+    'one hand syncopation': False,
+    'movement':             True,
+    'sticking':             True,
+    'linear':               True,
+    'coordination':         True,
+    'variety':              True,
+}
+assert set(AXES_ON) == set(AXES), f'AXES_ON must list every axis: {sorted(set(AXES) ^ set(AXES_ON))}'
+AXES = {a: ks for a, ks in AXES.items() if AXES_ON[a]}
 # Accents and ghosts only add bonus score: a hit with the wrong dynamic still counts, so they
 # never change percent. True rates charts for score chasing and adds the dynamics axis.
 DYNAMICS = False
