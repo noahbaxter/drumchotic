@@ -1,4 +1,5 @@
-"""Every plot worth looking at after a tuning pass, dark mode, into data/plots/<timestamp>/.
+"""Every plot worth looking at after a tuning pass, dark mode, into data/plots/<timestamp>/,
+plus check.html (drumchotic/page.py) for clicking through the model chart by chart.
 A run whose plots match the latest folder byte for byte just relabels that folder.
 
 python -m drumchotic.plots [name ...]      no names: every plot
@@ -334,6 +335,8 @@ def render(r, names=()):
         fig.tight_layout()
         fig.savefig(out / f'{name}.png', dpi=130)
         plt.close(fig)
+    from . import page          # page builds on this module's helpers
+    page.write(r, out / 'check.html')
     if previous and same_plots(out, previous):
         shutil.rmtree(out)
         previous.rename(out)
