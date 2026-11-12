@@ -8,6 +8,7 @@ and the axes that make each chart hard. Fit to DMBot leaderboard scores.
 Model work (knobs in `drumchotic/tuning.py`):
 
 ```
+scripts/run.sh [plot ...]                    # re-measure if stale, fit, report, plots into data/plots/
 scripts/sync_dmt.sh                          # DMT tournament charts from the NAS into data/dmt
 python -m drumchotic.report                  # accuracy, hardest charts, outliers
 python -m unittest

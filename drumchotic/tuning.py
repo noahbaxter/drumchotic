@@ -1,4 +1,9 @@
-"""Every knob that shapes a difficulty score, in one place."""
+"""Every knob that shapes a difficulty score, in one place. After editing, run
+    scripts/run.sh
+Anything above the COMBINE section changes what gets measured from a chart, so
+that run re-measures every chart (~45s); the feature caches key on this file's
+text up to the COMBINE marker. COMBINE and PLAYERS knobs only refit (~15s).
+"""
 
 # ---- STICKING: how hands get assigned (drumchotic/measure/sticking.py) ------
 # One hand hitting this often (ms apart) costs 1; cost grows with the cube of speed. A hand's
