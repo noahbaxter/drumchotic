@@ -13,10 +13,10 @@ import numpy as np
 from . import sticking
 from ..chart.model import Pad
 from ..chart.tempo import TempoMap
-from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, NOVEL_HISTORY, REPEAT_WEIGHT,
-                      SPEED_WINDOW_S, SUSTAINED_WINDOW_S)
+from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, NOVEL_HISTORY, REPEAT_WEIGHT, RUNS,
+                      SPEED_WINDOW_S, SUSTAINED_WINDOW_S, WINDOWS_S)
 from .playable import playable
-from .timing import worst_window
+from .timing import fastest_run, worst_window
 
 
 @dataclass
@@ -78,14 +78,27 @@ def gap_tokens(t):
     return np.r_[0, np.rint(np.diff(t) / 25.0).astype(int)] if len(t) else np.array([], int)
 
 
+def off_grid(ticks, res):
+    """1 for notes off the 8th-note grid."""
+    return ((np.asarray(ticks) * 2) % res != 0).astype(float)
+
+
+def strokes_of(o):
+    """The easiest sticking for every onset with a hand note."""
+    return sticking.assign([(float(o.t[i]), o.surfaces[i]) for i in np.where(o.has_hand)[0]])[0]
+
+
 def compute(chart):
     hits = playable(chart)
     if not hits:
         return None
     o = Onsets.of(hits)
+    strokes = strokes_of(o)
     f = {}
     f.update(speed(hits))
     f.update(density_and_endurance(hits, chart, o))
+    f.update(kicks(o, chart.resolution))
+    f.update(hands(o, strokes, chart.resolution))
     f.update({
         'length_s': max((o.t[-1] - o.t[0]) / 1000.0, 1.0),
         'notes': len(chart.hits),     # every note counts toward percent, roll lanes or not
@@ -153,3 +166,47 @@ def longest_stretch(dur, hot, joined):
         run = (run if j else 0.0) + d if h else 0.0
         best = max(best, run)
     return float(best)
+
+
+def limb(name, t, ticks, weight, res):
+    """One limb's (or limb group's) speed and syncopation: fastest runs, densest windows, notes
+    off the 8th-note grid and rhythms (gap patterns) not heard recently, per second."""
+    t = np.asarray(t, float)
+    off = off_grid(np.asarray(ticks, int), res)
+    novel = _new_grams(list(gap_tokens(t)))
+    f = {f'run{n}_{name}': fastest_run(t, n) for n in RUNS}
+    for w in WINDOWS_S:
+        f[f'nps_{name}_w{w}'] = worst_window(t, weight, w)
+        f[f'{name}_offbeat_w{w}'] = worst_window(t, off, w)
+        f[f'{name}_novel_w{w}'] = worst_window(t, novel, w)
+    return f
+
+
+def kicks(o, res):
+    """Kicks as a limb, plus kicks with no hand on them per second."""
+    k = o.has_kick
+    f = limb('kick', o.t[k], np.array(o.ticks)[k], o.weight[k], res)
+    alone = (k & ~o.has_hand)[k].astype(float)
+    for w in WINDOWS_S:
+        f[f'kick_alone_w{w}'] = worst_window(o.t[k], alone, w)
+    return f
+
+
+def hands(o, strokes, res):
+    """Both hands together (every onset with a hand note), and each hand alone (the worse of the
+    two, per feature, from the chosen sticking)."""
+    h = o.has_hand
+    f = limb('hands', o.t[h], np.array(o.ticks)[h], o.weight[h], res)
+    tick_at, weight_at = dict(zip(o.t, o.ticks)), dict(zip(o.t, o.weight))
+    per_hand = [limb('onehand', t, [tick_at[x] for x in t], np.array([weight_at[x] for x in t]), res)
+                for t in hand_times(strokes).values()]
+    f.update({k: max(p[k] for p in per_hand) for k in per_hand[0]})
+    return f
+
+
+def hand_times(strokes):
+    """Stroke times per hand: {0: left, 1: right}."""
+    out = {0: [], 1: []}
+    for s in strokes:
+        out[s.hand].append(s.time_ms)
+    return {h: np.array(v) for h, v in out.items()}

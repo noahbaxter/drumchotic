@@ -58,5 +58,13 @@ class EnduranceTests(unittest.TestCase):
         self.assertEqual(features.longest_stretch(dur, [True, True, True, True], [False, True, False, True]), 2.0)
 
 
+class LimbTests(unittest.TestCase):
+    def test_a_fill_is_a_hand_burst_but_not_hand_stamina(self):
+        fill = [hit(4 * 4 * RES + i * SIXTEENTH // 2, Pad.RED) for i in range(8)]
+        a, b = features.compute(chart(groove(0, 8))), features.compute(chart(groove(0, 8) + fill))
+        self.assertGreater(b['run8_hands'], a['run8_hands'])
+        self.assertAlmostEqual(b['run64_hands'], a['run64_hands'], delta=0.5)
+
+
 if __name__ == '__main__':
     unittest.main()

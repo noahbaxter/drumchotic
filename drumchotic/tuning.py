@@ -32,6 +32,10 @@ CYMBAL_HEIGHT = 0.5
 LEFT_CRASH = True
 
 # ---- FEATURES: what gets measured from a chart (drumchotic/measure/features.py)
+# Sliding windows (seconds): 1 = burst, 4 = section, 16 = sustained.
+WINDOWS_S = (1, 4, 16)
+# "Fastest run of N notes" lengths for kicks, both hands and one hand.
+RUNS = (4, 8, 16, 32, 64)
 # Speed: the most notes (chords count each note) in any window this long.
 SPEED_WINDOW_S = 1
 # Density: notes/s per chunk of this many quarter notes. A fixed tick span, so 3/16 and 13/4
