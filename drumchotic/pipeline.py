@@ -1,5 +1,6 @@
 """Fit everything from the feature caches once; rate, report, audit, plots and page read the result."""
 import collections
+import functools
 import hashlib
 import json
 import pickle
@@ -14,6 +15,7 @@ from .chart import song
 from .fit import players
 from .fit.axes import AxisModel
 from .fit.metrics import tier_accuracy
+from .measure import familiarity
 from .sources import dmt, leaderboard, tournaments
 from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
@@ -23,12 +25,22 @@ BOOTSTRAPS = 200
 
 
 def load_features(*names):
+    """md5 -> {'folder', 'title', 'features'}, rarity features (build_familiarity) folded in."""
     out = {}
     for n in names:
         p = DATA / 'cache' / n
         if p.exists():
             out.update(json.loads(p.read_text()))
+    rarity = json.loads((DATA / 'cache/familiarity.json').read_text())
+    for m, e in out.items():
+        e['features'].update(rarity[m])
     return out
+
+
+@functools.cache
+def patterns():
+    """The library's run table, for scoring rarity on charts outside the library."""
+    return familiarity.Table.load(DATA / 'cache/patterns.npz')
 
 
 @dataclass

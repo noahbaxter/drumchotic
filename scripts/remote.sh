@@ -39,7 +39,8 @@ pull() { ssh "$HOST" "cd $DIR && tar -cf - $1" | tar -xf - ; }
 case $step in
   features)
     remote 'for set in charts:features dmt:features_dmt anchors:features_anchors; do
-              .venv/bin/python -m drumchotic.build_features "data/${set%%:*}" "data/cache/${set##*:}.json"; done' ;;
+              .venv/bin/python -m drumchotic.build_features "data/${set%%:*}" "data/cache/${set##*:}.json"; done
+            .venv/bin/python -m drumchotic.build_familiarity' ;;
   report) remote ".venv/bin/python -m drumchotic.report $(printf '%q ' "$@")" ;;
   audit) remote ".venv/bin/python -m drumchotic.audit $(printf '%q ' "$@")" ;;
   web) remote ".venv/bin/python -m web.build" && pull "data/web/data.json data/web/index.html" && echo "-> data/web/" ;;

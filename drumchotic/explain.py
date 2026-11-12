@@ -8,10 +8,10 @@ import sys
 import numpy as np
 
 from .chart import song
-from .measure import features, sticking
+from .measure import familiarity, features, sticking
 from .measure.playable import playable
 from .measure.timing import fastest_run_at, window_sums
-from .pipeline import load_features
+from .pipeline import load_features, patterns
 from .tuning import AXES, DENSITY_BEATS, ENDURANCE_NPS, SPEED_WINDOW_S
 
 ENDURANCE_SHOWN = ENDURANCE_NPS[len(ENDURANCE_NPS) // 2]
@@ -29,6 +29,7 @@ HEADLINE = {
     'coordination': ('coord_offbeat_w4', 'per second, the lesser of kicks and hand notes off the 8th grid, densest 4s'),
     'variety': ('limb_novel_w4', 'new limb orders per second, densest 4s'),
     'dynamics': ('dynamics_w4', 'accents and ghosts per second, densest 4s'),
+    'rare patterns': ('rarity_w4', 'rarity of the runs played (few other artists play them) per second, densest 4s'),
 }
 for _label, (_key, _unit) in LIMBS.items():
     HEADLINE[f'{_label} burst'] = (f'run{BURST_SHOWN}_{_key}', f'{_unit}/s over the fastest {BURST_SHOWN}')
@@ -78,6 +79,8 @@ def peaks(chart):
     ch = features.chunks(hits, chart, features.repeat_weights(hits, o))
     res = chart.resolution
     tick_at = dict(zip(o.t, o.ticks))
+    run_t, run_h = familiarity.runs(chart)
+    run_t = run_t[:len(run_h)]
     limb_times = {
         'kick': [o.t[o.has_kick]],
         'hand': [o.t[o.has_hand]],
@@ -93,6 +96,7 @@ def peaks(chart):
         'coordination': _window_peak(o.t, features.coordination_series(o, res, WINDOW_S)['offbeat']),
         'variety': _window_peak(o.t, ws(o.t, features.limb_order_series(o, strokes))),
         'dynamics': _window_peak(o.t, ws(o.t, o.dynamics)),
+        'rare patterns': _window_peak(run_t, ws(run_t, patterns().rarity(run_h, in_table=True))),
     }
     for label, times in limb_times.items():
         out[f'{label} burst'] = max((fastest_run_at(t, BURST_SHOWN) for t in times), key=lambda p: p[0])

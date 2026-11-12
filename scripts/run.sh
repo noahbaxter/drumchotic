@@ -13,5 +13,6 @@ for set in charts:features dmt:features_dmt anchors:features_anchors; do
         $PY -m drumchotic.build_features "data/${set%%:*}" "data/cache/${set##*:}.json"
     fi
 done
+$PY -m drumchotic.build_familiarity
 
 $PY -m drumchotic "$@"
