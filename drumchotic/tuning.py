@@ -49,6 +49,8 @@ SUSTAINED_WINDOW_S = 30
 # Endurance: share of playing time, and longest unbroken stretch, at or above each of these
 # notes/s (same chunks as density). Neither grows just because a chart is long.
 ENDURANCE_NPS = (8, 10, 12)
+# A hand move counts fully as travel when the gap is shorter than this (ms).
+TRAVEL_CLOSE_MS = 250.0
 # How many onsets back a pattern has to be seen before it stops counting as new (variety).
 NOVEL_HISTORY = 32
 # How much a note inside a repeating pattern counts toward density, travel and cymbal

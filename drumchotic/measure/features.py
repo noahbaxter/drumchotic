@@ -14,7 +14,7 @@ from . import sticking
 from ..chart.model import Pad
 from ..chart.tempo import TempoMap
 from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, NOVEL_HISTORY, REPEAT_WEIGHT, RUNS,
-                      SPEED_WINDOW_S, SUSTAINED_WINDOW_S, WINDOWS_S)
+                      SPEED_WINDOW_S, SUSTAINED_WINDOW_S, TRAVEL_CLOSE_MS, WINDOWS_S)
 from .playable import playable
 from .timing import fastest_run, worst_window
 
@@ -99,6 +99,7 @@ def compute(chart):
     f.update(density_and_endurance(hits, chart, o))
     f.update(kicks(o, chart.resolution))
     f.update(hands(o, strokes, chart.resolution))
+    f.update(hand_movement(strokes, dict(zip(o.t, o.weight))))
     f.update({
         'length_s': max((o.t[-1] - o.t[0]) / 1000.0, 1.0),
         'notes': len(chart.hits),     # every note counts toward percent, roll lanes or not
@@ -210,3 +211,39 @@ def hand_times(strokes):
     for s in strokes:
         out[s.hand].append(s.time_ms)
     return {h: np.array(v) for h, v in out.items()}
+
+
+def moves(strokes, weight_at):
+    """Each time a hand changes surface: (time, distance strain, cymbal/drum switch strain).
+    Strain is full when the move is quicker than TRAVEL_CLOSE_MS, and repeats count less."""
+    per_hand = {0: [], 1: []}
+    for s in strokes:
+        per_hand[s.hand].append(s)
+    out = []
+    for seq in per_hand.values():
+        for a, b in zip(seq, seq[1:]):
+            if a.surface == b.surface:
+                continue
+            close = min(1.0, TRAVEL_CLOSE_MS / max(b.time_ms - a.time_ms, 1.0)) * weight_at[b.time_ms]
+            switch = sticking.CYMBAL[a.surface] != sticking.CYMBAL[b.surface]
+            out.append((b.time_ms, sticking.DIST[a.surface, b.surface] * close, close if switch else 0.0))
+    out.sort()
+    return tuple(np.array(c) for c in zip(*out)) if out else (np.array([]),) * 3
+
+
+def sticking_series(strokes):
+    """Stroke times and what each stroke costs in the chosen sticking."""
+    return np.array([s.time_ms for s in strokes]), np.array([s.cost for s in strokes])
+
+
+def hand_movement(strokes, weight_at):
+    """From the sticking: travel, cymbal/drum switching, and the cost of the easiest sticking
+    itself (speed, runs, travel, crossing and reach together)."""
+    f = {}
+    st, cost = sticking_series(strokes)
+    t, dist, switch = moves(strokes, weight_at)
+    for w in WINDOWS_S:
+        f[f'sticking_w{w}'] = worst_window(st, cost, w)
+        f[f'travel_w{w}'] = worst_window(t, dist, w)
+        f[f'cymswitch_w{w}'] = worst_window(t, switch, w)
+    return f
