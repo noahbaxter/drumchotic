@@ -131,8 +131,9 @@ def compute(chart):
     o = Onsets.of(hits)
     strokes = strokes_of(o)
     f = {}
-    f.update(speed(hits))
-    f.update(density_and_endurance(hits, chart, o))
+    moments = one_per_moment(hits)
+    f.update(speed(moments))
+    f.update(density_and_endurance(moments, chart, o))
     f.update(kicks(o, chart.resolution))
     f.update(hands(o, strokes, chart.resolution))
     f.update(hand_movement(strokes, dict(zip(o.t, o.weight))))
@@ -144,8 +145,14 @@ def compute(chart):
         'length_s': max((o.t[-1] - o.t[0]) / 1000.0, 1.0),
         'notes': len(chart.hits),     # every note counts toward percent, roll lanes or not
         'rolls': len(chart.rolls),
+        'five_lane': five_lane(chart),
     })
     return f
+
+
+def five_lane(chart):
+    """1 for a 5-lane track: Clone Hero plays them harder than their notes say (see fit/axes.py)."""
+    return float(chart.track_type == model.TrackType.FIVE_LANE)
 
 
 def empty_features(chart):
@@ -153,8 +160,15 @@ def empty_features(chart):
     probe = DrumChart('empty', chart.track_type, chart.pro_marked, chart.resolution,
                       [Hit(0, 0.0, Pad.KICK, False), Hit(chart.resolution, 500.0, Pad.KICK, False)], tempos=[(0, 120.0)])
     f = {k: 0.0 for k in compute(probe)}
-    f.update({'length_s': 1.0, 'notes': len(chart.hits), 'rolls': len(chart.rolls)})
+    f.update({'length_s': 1.0, 'notes': len(chart.hits), 'rolls': len(chart.rolls), 'five_lane': five_lane(chart)})
     return f
+
+
+def one_per_moment(hits):
+    """The first hit at each tick: a kick under a hand note is one moment to play, not two notes.
+    Speed, density and endurance on moments: leaderboard 0.919 -> 0.923, tiers 0.939 -> 0.938."""
+    seen = set()
+    return [h for h in hits if not (h.tick in seen or seen.add(h.tick))]
 
 
 def note_times(hits):
@@ -162,7 +176,7 @@ def note_times(hits):
 
 
 def speed(hits):
-    """Max notes per second: the most notes in any SPEED_WINDOW_S, every note counted."""
+    """Max notes per second: the most notes in any SPEED_WINDOW_S."""
     t = note_times(hits)
     return {'max_nps': worst_window(t, np.ones(len(t)), SPEED_WINDOW_S)}
 

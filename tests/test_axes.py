@@ -14,7 +14,21 @@ def charts(length_effect, n=2000, seed=0):
     length = np.exp(rng.uniform(np.log(60), np.log(1200), n))
     past = np.maximum(np.log(length) - np.median(np.log(length)), 0.0)
     y = np.log1p(nps) + length_effect * past + rng.normal(0, 0.05, n)
-    return [{'max_nps': a, 'length_s': b} for a, b in zip(nps, length)], y
+    return [{'max_nps': a, 'length_s': b, 'five_lane': 0.0} for a, b in zip(nps, length)], y
+
+
+class FiveLaneStepTests(unittest.TestCase):
+    def test_recovers_step(self):
+        feats, y = charts(0.0)
+        for i, f in enumerate(feats):
+            f['five_lane'] = float(i % 10 == 0)
+        y = y + 0.4 * np.array([f['five_lane'] for f in feats])
+        m = AxisModel(power=1, axes=AXES).fit(feats, y)
+        self.assertAlmostEqual(m.five_lane_step, 0.4, delta=0.03)
+
+    def test_four_lane_only_leaves_it_off(self):
+        feats, y = charts(0.0)
+        self.assertEqual(AxisModel(power=1, axes=AXES).fit(feats, y).five_lane_step, 0.0)
 
 
 class LengthDiscountTests(unittest.TestCase):

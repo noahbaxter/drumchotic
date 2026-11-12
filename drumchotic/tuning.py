@@ -103,6 +103,12 @@ AXIS_SCALE = {}
 # never positive, so only charts longer than typical move. Held-out: leaderboard 0.908 -> 0.912,
 # tiers flat, community 96% -> 100%.
 LENGTH_DISCOUNT = True
+# 5-lane tracks (all Neversoft Guitar Hero ports in the pool) play about 0.4 harder than their notes
+# say: 51 songs charted both ways have the same onsets and model rating, but the GH version scores
+# 0.47 harder. Not in the notes (tempo maps, off-grid notes, pad mapping all ruled out), so likely how
+# Clone Hero plays 5-lane. One step fit after length. Held-out: leaderboard 0.923 -> 0.926, tiers
+# 0.938 -> 0.934 (Icebreaker 2022's 27 GH World Tour charts, tiered by their notes), community 100%.
+FIVE_LANE_STEP = True
 # Which features feed each axis.
 AXES = {
     'speed': ['max_nps'],
