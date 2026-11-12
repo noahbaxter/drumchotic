@@ -15,22 +15,29 @@ MIN_PER_LEVEL = 20     # labels with fewer library charts don't anchor a scale
 # Charter ratings below this don't follow difficulty (0 mostly means unrated, 1 and 2 overlap),
 # so the charter scale is built from this rating up and extends its slope downward.
 CHARTER_FROM = 2
+# Map model score to tier and diff with one straight line fit through the labels' medians, so
+# every tier is the same width. False joins the medians dot to dot, which bakes their noise in.
+LINEAR_SCALE = True
 REASONS_SHOWN = 3      # stand-out axes listed per chart
 
 
 class Scale:
-    """Model score -> a labelled scale, by interpolating between each label's median score.
-    Past either end it keeps that end's slope, so 8.6 reads as 'well past a typical 8'."""
+    """Model score -> a labelled scale from each label's median score: a straight line fit through
+    them (LINEAR_SCALE), or interpolating between them. Either way it keeps counting past the ends,
+    so 8.6 reads as 'well past a typical 8'."""
 
     def __init__(self, scores, labels):
         s, lab = np.asarray(scores), np.asarray(labels)
         levels = sorted(v for v in set(labels) if (lab == v).sum() >= MIN_PER_LEVEL)
         self.levels = np.array(levels, float)
         self.medians = np.maximum.accumulate([np.median(s[lab == v]) for v in levels])
+        self.slope, self.intercept = np.polyfit(self.medians, self.levels, 1)
 
     def __call__(self, x):
         lv, md = self.levels, self.medians
-        if x > md[-1]:
+        if LINEAR_SCALE:
+            v = self.intercept + self.slope * x
+        elif x > md[-1]:
             v = lv[-1] + (x - md[-1]) / max(md[-1] - md[-2], 1e-9) * (lv[-1] - lv[-2])
         elif x < md[0]:
             v = lv[0] - (md[0] - x) / max(md[1] - md[0], 1e-9) * (lv[1] - lv[0])
@@ -52,7 +59,8 @@ class Rater:
         rated = [(r.pred[m], d) for m in self.lib
                  if CHARTER_FROM <= (d := charter_rating(r.library[m]['folder'])) <= 6]
         self.charter = Scale(*zip(*rated))
-        self.level = Scale(*zip(*[(r.tier_pred[m], lab.tier) for lab, m in r.labels if m in r.tier_pred]))
+        self.level = Scale(*zip(*[(r.tier_pred[m], lab.modern) for lab, m in r.labels
+                                  if m in r.tier_pred and lab.modern is not None]))
         self.placed = collections.defaultdict(set)    # md5 -> tiers tournaments placed it in
         for lab, m in r.labels:
             self.placed[m].add(lab.tier)

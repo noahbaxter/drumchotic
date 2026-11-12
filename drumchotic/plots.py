@@ -76,7 +76,7 @@ def plot_tiers(r):
     fig, axs = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     for ax, score, color, label in ((axs[0], r.tier_pred, OURS, 'Chart model'),
                                     (axs[1], r.fit.difficulty, OTHER, 'Leaderboard')):
-        rows = [(lab.tier, score[m]) for lab, m in r.labels if m in score]
+        rows = [(lab.modern, score[m]) for lab, m in r.labels if m in score and lab.modern is not None]
         tier_panel(ax, *zip(*rows), f'{label}  ·  {tier_accuracy(r.labels, score):.1%} in order')
     axs[0].set_ylabel('difficulty')
     return fig
@@ -148,8 +148,8 @@ def plot_distribution(r):
     top = counts.max()
     by_tier = collections.defaultdict(list)
     for lab, m in r.labels:
-        if m in r.pred:
-            by_tier[lab.tier].append(r.pred[m])
+        if m in r.pred and lab.modern is not None:
+            by_tier[lab.modern].append(r.pred[m])
     for i, (tier, vals) in enumerate(sorted(by_tier.items())):
         x, lift = np.median(vals), 0.07 * (i % 2)       # alternate heights so close tiers don't collide
         ax.plot([x, x], [top * 1.02, top * (1.08 + lift)], color=INK_2, lw=1)

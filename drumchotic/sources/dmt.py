@@ -10,13 +10,25 @@ from pathlib import Path
 SKIP = ('Conquest Contenders', 'Clonpardy', 'Pro SD')
 TIER = re.compile(r'(?:\bT|Tier\s*)(\d+)$')
 SUDDEN_DEATH = re.compile(r'\bSD\b|Sudden Death')
+# Tiers mean the same thing across tournaments from this year on. Older ones (and undated ones,
+# like BirdmanExe) numbered their tiers their own way: they still order their own songs, but stay
+# out of anything that pools tiers across tournaments. Checked 2026-11-11: armchairsum65's
+# renumbering of Birdman and Summer Blast 2023 lands on the same tier medians as this cut.
+LADDER_FROM = 2024
+YEAR = re.compile(r'\b(20\d\d)\b')
 
 
 @dataclass(frozen=True)
 class Label:
     folder: Path
     group: str
-    tier: int
+    tier: int          # as the tournament named it
+
+    @property
+    def modern(self):
+        """The tier on today's ladder, for comparing across tournaments; None before LADDER_FROM."""
+        m = YEAR.search(self.group)
+        return self.tier if m and int(m.group(1)) >= LADDER_FROM else None
 
 
 def _label(song_dir, root):
