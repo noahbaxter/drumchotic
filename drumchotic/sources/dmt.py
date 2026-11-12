@@ -1,15 +1,15 @@
 """Drummer's Monthly tournament tiers: the folder a song sits in is its tier.
 
-Tiers only order songs within one tournament (and its sudden death set), never across them.
+Tiers only order songs within one tournament, never across them. A sudden death set's tiers are
+the same as its tournament's (armchairsum65), so its songs join the tournament's tiers.
 """
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
-# themed rounds, not difficulty tiers
+# themed rounds, not difficulty tiers; Icebreaker 2023's Pro SD isn't tiered and varies a lot
 SKIP = ('Conquest Contenders', 'Clonpardy', 'Pro SD')
 TIER = re.compile(r'(?:\bT|Tier\s*)(\d+)$')
-SUDDEN_DEATH = re.compile(r'\bSD\b|Sudden Death')
 # Tiers mean the same thing across tournaments from this year on. Older ones (and undated ones,
 # like BirdmanExe) numbered their tiers their own way: they still order their own songs, but stay
 # out of anything that pools tiers across tournaments. Checked 2026-11-11: armchairsum65's
@@ -40,10 +40,7 @@ def _label(song_dir, root):
     m = TIER.search(tier_dir)
     if not m:
         return None
-    group = parts[0]
-    if any(SUDDEN_DEATH.search(p) for p in parts[1:-1]):
-        group += ' / SD'
-    return Label(song_dir, group, int(m.group(1)))
+    return Label(song_dir, parts[0], int(m.group(1)))
 
 
 def load(root):

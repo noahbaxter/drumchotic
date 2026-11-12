@@ -399,13 +399,13 @@ $('scatter').addEventListener('mouseleave', () => { hideTip(); $('sring').style.
 const LADDER_FROM = 2024;   // as sources/dmt.py: older tournaments numbered tiers their own way
 const yearOf = g => +(g.match(/\b(20\d\d)\b/) || [0, 0])[1];
 const SHORT = [[/Icebreaker/, 'IB'], [/Summer Blast/, 'SB'], [/Legacy Cup/, 'LC'], [/Drummer's Monthly (\d)/, 'DM'], [/Birdman/, 'BX']];
-// oldest first by bracket start date (data/results), each sudden death set right after its tournament
-const startOf = g => (DATA.started || {})[g.replace(' / SD', '').replace(' Setlist', '')] || String(yearOf(g));
+// oldest first by bracket start date (data/results)
+const startOf = g => (DATA.started || {})[g.replace(' Setlist', '')] || String(yearOf(g));
 const byDate = (a, b) => startOf(a).localeCompare(startOf(b)) || a.localeCompare(b);
 function shortName(g) {
-  const base = g.replace(' / SD', ''), hit = SHORT.find(([re]) => re.test(base));
-  const tail = !hit ? '' : hit[1] === 'DM' ? base.match(hit[0])[1] : yearOf(base) ? String(yearOf(base) % 100).padStart(2, '0') : '';
-  return (hit ? hit[1] + tail : base) + (g.endsWith(' / SD') ? ' SD' : '');
+  const hit = SHORT.find(([re]) => re.test(g));
+  const tail = !hit ? '' : hit[1] === 'DM' ? g.match(hit[0])[1] : yearOf(g) ? String(yearOf(g) % 100).padStart(2, '0') : '';
+  return hit ? hit[1] + tail : g;
 }
 let tview = 'dots';
 try { tview = localStorage.getItem('drumchotic-tourney-view') || 'dots'; } catch (e) {}

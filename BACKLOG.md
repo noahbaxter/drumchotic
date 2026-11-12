@@ -1,36 +1,62 @@
 # Backlog
 
-Community feedback and tuning ideas, newest first. Source in brackets.
+Plans, community feedback and tuning ideas. Source in brackets; the raw threads are in data/feedback/ (gitignored), findings in docs/findings.md.
+
+## Next up, in order
+1. Run the heavy steps on bazzite (feature build, fit, audit, reports, page) from one script; the Mac only pulls results.
+2. Incremental feature cache: store features per chart and per feature group, keyed by the code that made them, so new charts or a new feature don't re-measure everything; tune on the ~7,500 training charts and measure the full library only before publishing.
+3. Flag charts beyond human limits.
+4. Length: the strongest miss left. The model rates long charts harder than the leaderboard (rank corr -0.23); goes with album charts and short-burst-vs-whole-song below.
+5. Familiarity feature.
+6. Sticking rework.
+7. FC readout and hand endurance.
+
+## Product
+- [ ] State what the rating is, on the site and in the README, for users as well as us: misses on expert 2x kick (accuracy, not score or star power, passing doesn't count); 0 means easier than a typical tier 1 tournament song; the top end is anchored by absurd charts (quadruple kick, Venetian Snares); the goal is an average difficulty that doesn't over-reward any one skill, the way tournament tiers try to. [Half-Gallon: "they just need to be stated and understood on your side AND the user side"]
+- [ ] Decide the floor and ceiling deliberately. Half-Gallon: DM tier 1 should sit around a Rock Band 2 to 3 diff, so the floor is much lower than today's; a ceiling is required, the question is how much room to leave above (stage tour debated room for 300 BPM slop). Noah: a proper 0 to 10 would be nice. [Half-Gallon, Noah]
+- [ ] Explain the axes in plain words on the site (armchair asked what speed vs density means). [armchair]
+- [ ] Suggest a difficulty when exporting a chart from chartchotic. [Noah, end goal]
+- [ ] Let people test upcoming tournament setlists (works today with scripts/rate.sh on the setlist folder; armchair and Pile are using the site for the next setlist). [armchair]
+
+## Infrastructure
+- [ ] bazzite runs the heavy work: repo at ~/drumchotic (git remote `bazzite`), venv, data/charts as a local copy (virtiofs to the NAS is too slow to walk). Needs a script that pushes code, runs a step, and pulls back results, plus keeping its chart copy in sync from the NAS plocate list.
+- [ ] Incremental feature cache (see Next up).
+- [ ] Delete the Mac's data/charts (2.9 GB) once bazzite does all measuring.
+- [ ] From the rebuild agent: modules run outside the repo root silently find no data (pipeline.DATA is cwd-relative); check page and explorer peer windows differ by one (601 vs 600); the live-reload server doesn't watch data/dmt, leaderboards or results.
 
 ## Data
 - [x] Copy every unique chart on the NAS from the plocate index (31,898 local), including the Rock Band discs and RB1/RB2 DLC.
 - [x] Add Drummer's Monthly 1 to 3 and Icebreaker 2022 to data/dmt from the Google Drive zips (not on the NAS drive).
-- [ ] Fetch played charts we don't have, by md5: Rock Band Network (849 played), RB3 and RB4 era DLC (about 1,200), and other versions of songs we have (e.g. Rush YYZ, Hail The Sun Domino).
 - [x] Old tournaments numbered tiers their own way, so only 2024 on sets the tier scale; older ones still order their own songs. armchair's renumbering (Birdman 3/5/7, Summer Blast 2023 2/4/5/6/7) lands on the same tier medians as this cut. [armchair, Noah]
+- [ ] Fetch played charts we don't have, by md5: Rock Band Network (849 played), RB3 and RB4 era DLC (about 1,200), and other versions of songs we have (e.g. Rush YYZ, Hail The Sun Domino).
+- [ ] Easy-end data: our leaderboard skews to strong players, so the bottom is the least certain part. Candidates: official Rock Band setlists' within-set order (Half-Gallon: their floor is too low and ceiling way too low, so use order only, not their numbers), full band charters who do easier bands (Half-Gallon, Paramore and the like), Josh's charts. [Half-Gallon, Noah]
 - [ ] Charter ratings mix standards: Leo switched rating standards at some point, so his older diff_drums don't line up with his newer ones. [armchair]
+- [x] Sudden death sets: their tiers are the same as their tournament's, so SD songs join the tournament's tiers; Icebreaker 2023's Pro SD isn't tiered and stays out. [armchair]
 
 ## Outliers
 - [x] No rate from impossible time spans: density chunks at least 0.5s, run gaps at least 15ms (joke tempo maps, stacked notes).
 - [x] A drum track with nothing to play rates as easy as it gets.
-- [ ] Flag charts beyond human limits (meme charts like Soulless 4) instead of ranking them with everything else.
+- [ ] Flag charts beyond human limits (meme charts like Soulless 4, programmed remixes, extratone and breakcore) instead of ranking them with everything else. Noah: hard to count those as valuable at the top.
+- [ ] Add highfine's pick, the Never Kill a Mouse demo, to the anchor charts. [highfine]
 
 ## Scale
-- [ ] Fit one straight line through the tier medians instead of joining the dots, so tiers are evenly spaced and the level histogram is smooth.
-- [ ] Say what the scale is for, and its floor and ceiling: DM tier 1 should be about a Rock Band 2 to 3 diff. [Half-Gallon]
+- [x] Fit one straight line through the tier medians instead of joining the dots, so tiers are evenly spaced and the level histogram is smooth.
+- [ ] Offer a 50/50 blend of overall difficulty and difficulty within the band's catalog, Half-Gallon's own approach since customs skew too hard to compare across. [Half-Gallon]
 
 ## Features
-- [ ] Endurance looks underrated. [armchair] Checked against the leaderboard (2026-11-11): it isn't. High-endurance charts are slightly overrated (top 5% by longest dense stretch: model 0.06 too hard, about 3 se) and long charts most of all (rank corr -0.23). Percent forgives fatigue; endurance mostly costs the FC, so the FC readout below is the fix, not a bigger endurance weight.
-- [ ] Short hard bursts vs whole-song difficulty: Pieces of You's intro over-rates it; charts with one really hard section (Destrage, Everything Sucks) or inconsistent difficulty get under-rated. Tune how long a hard stretch has to last to count fully, rather than a straight max over sections. [armchair, Half-Gallon]
-- [ ] Familiarity: patterns common across the whole library feel natural and should count as easier. Best lead on the chops gap. [armchair: "it doesn't understand what feels natural"]
+- [ ] Endurance: armchair says it's underrated, especially hand endurance (Breaking the Habit). Checked against the leaderboard (2026-11-11): overall it isn't; high-endurance charts are slightly overrated and long charts most of all (rank corr -0.23). Percent forgives fatigue and endurance mostly costs the FC, so look at hand endurance on its own and through the FC readout. [armchair]
+- [ ] Short hard bursts vs whole-song difficulty: Pieces of You's intro over-rates it; charts with one really hard section (Destrage, Everything Sucks) or inconsistent difficulty get under-rated. Half-Gallon: drop or limit the metrics that let quick bursts inflate the overall number. Noah's idea: rate each section and look at the hardest. Tune how long a hard stretch has to last to count fully. [armchair, Half-Gallon, Noah]
+- [ ] Familiarity: patterns common across the whole library feel natural and should count as easier. Best lead on the chops gap (jazz, remixes, hand charts underrated; consistent-density pop punk overrated). [armchair: "it doesn't understand what feels natural", Noah]
 - [ ] Sticking misses open-handed playing (Shedding), crossunders (As Good As Dead, an FC killer), and lead-foot switching in kick bursts (Warborn). [armchair]
-- [ ] Album charts and very long charts behave oddly; length shouldn't inflate difficulty. [armchair]
+- [ ] Album charts and very long charts behave oddly; length shouldn't inflate difficulty. [armchair, Noah]
 - [ ] TDEP style charts (Dillinger) trick the model. [armchair]
+- [ ] Rename "linear" to "alternation": it counts blast beats too (Noah), and consider splitting blasts out.
+- [ ] Lockslip gut check: End the Conversation is too low (its ending), Inglorius is too high. Add as a community claim once checked. [Noah]
 
 ## Evaluation
 - [x] Community claims as a third scorecard (labels/community.txt, printed by report). Car Bomb from armchair: 51 of 53 pairs right.
 - [ ] Add more community claims as they come in (one "@ artist | who, where" block each).
+- [ ] Compare against tournament tiers, not against other raters: Half-Gallon says the tier comparison is the meaningful one and the other rater measures a different thing (apples and oranges). If a comparison is wanted, tweak our formula into a like-for-like version and compare our two versions to each other. [Half-Gallon]
 - [ ] FC target from is_fc, as its own readout (one awkward spot kills an FC but barely moves percent). [Half-Gallon]
-- [ ] A variant without burst axes, closer to how stage tour rates. [Half-Gallon]
-
-## Tools
-- [ ] Let people test upcoming tournament setlists (works today: scripts/rate.sh on the setlist folder). [armchair]
+- [ ] A variant without burst axes, closer to how stage tour rates (rating all difficulties easy to hard plus star power). [Half-Gallon]
+- [ ] A five-family readout like stage tour's pentagon, where the single number is the pentagon's average. [Half-Gallon]
