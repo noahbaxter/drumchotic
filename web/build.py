@@ -1,6 +1,7 @@
 """Explorer page: the library as filterable plots and a table, one self-contained HTML file.
 
 scripts/web.sh         writes data/web/index.html (and data.json) and opens it
+scripts/serve.sh       serves it locally, reloading on changes
 """
 import collections
 import json
