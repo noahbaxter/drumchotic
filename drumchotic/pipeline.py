@@ -1,4 +1,5 @@
 """Fit everything from the feature caches once; rate, report, audit, plots and page read the result."""
+import collections
 import hashlib
 import json
 import pickle
@@ -7,15 +8,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from scipy.stats import spearmanr
 
 from .chart import song
 from .fit import players
 from .fit.axes import AxisModel
+from .fit.metrics import tier_accuracy
 from .sources import dmt, leaderboard, tournaments
-from .tuning import MIN_NOTES, MIN_SCORES
+from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
 DATA = Path('data')
 FOLDS = 5
+BOOTSTRAPS = 200
 
 
 def load_features(*names):
@@ -52,6 +56,27 @@ class Results:
         """Leaderboard difficulty and held-out prediction for every pool chart, as two arrays."""
         return (np.array([self.fit.difficulty[m] for m in self.pool]),
                 np.array([self.held_out[m] for m in self.pool]))
+
+    def shares(self, ms):
+        """Each axis's slice of difficulty above the intercept, {axis: array}. With the power mean
+        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept."""
+        p = self.model.power
+        a = np.array([[self.axes[x][m] for m in ms] for x in AXES])
+        S = (a ** p).sum(0) ** (1 / p)
+        return dict(zip(AXES, a ** p / np.where(S > 0, S, 1) ** (p - 1)))
+
+    def noise(self):
+        """Bootstrap sd of the held-out Spearman (over charts) and tier accuracy (over tournaments)."""
+        rng = np.random.default_rng(0)
+        lb, ho = self.pool_scores()
+        sp = [spearmanr(lb[i], ho[i])[0] for i in (rng.integers(0, len(lb), len(lb)) for _ in range(BOOTSTRAPS))]
+        groups = collections.defaultdict(list)
+        for lab, m in self.labels:
+            groups[lab.group].append((lab, m))
+        names = list(groups)
+        tiers = [tier_accuracy([x for i in rng.choice(len(names), len(names)) for x in groups[names[i]]], self.tier_pred)
+                 for _ in range(BOOTSTRAPS)]
+        return float(np.std(sp)), float(np.std(tiers))
 
 
 def fold_of(pool):
