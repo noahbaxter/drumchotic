@@ -32,6 +32,25 @@ CYMBAL_HEIGHT = 0.5
 LEFT_CRASH = True
 
 # ---- FEATURES: what gets measured from a chart (drumchotic/measure/features.py)
+# Speed: the most notes (chords count each note) in any window this long.
+SPEED_WINDOW_S = 1
+# Density: notes/s per chunk of this many quarter notes. A fixed tick span, so 3/16 and 13/4
+# bars weigh the same; chunks with no notes are silence and skipped.
+DENSITY_BEATS = 4
+# Density at these quantiles of the chart's playing time (chunks weighted by duration):
+# p50 = half the time you're playing, it's at least this dense.
+DENSITY_QUANTILES = (0.5, 0.75, 0.9)
+# Density also takes the densest stretch this long (s): what you have to get through at its worst.
+SUSTAINED_WINDOW_S = 30
+# Endurance: share of playing time, and longest unbroken stretch, at or above each of these
+# notes/s (same chunks as density). Neither grows just because a chart is long.
+ENDURANCE_NPS = (8, 10, 12)
+# How many onsets back a pattern has to be seen before it stops counting as new (variety).
+NOVEL_HISTORY = 32
+# How much a note inside a repeating pattern counts toward density, travel and cymbal
+# switching (1 = same as a new pattern). Grooves you lock into are easier to sustain than
+# the same density of changing material. Raw speed (fastest runs) is never discounted.
+REPEAT_WEIGHT = 0.7
 # Notes inside roll lanes: 'half' keeps every other note (the speed actually needed
 # to not miss), 'skip' drops them, 'full' counts every note.
 ROLL_MODE = 'half'
