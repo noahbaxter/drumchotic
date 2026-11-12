@@ -15,10 +15,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
-from scipy.stats import spearmanr
+from scipy.stats import rankdata, spearmanr
 
 from . import pipeline, report
 from .fit.metrics import tier_accuracy
+from .sources import fretwork
 from .tuning import AXES
 
 SURFACE, INK, INK_2, GRID = '#1a1a19', '#f0efec', '#c3c2b7', '#2c2c2a'
@@ -266,6 +267,32 @@ def plot_features(r):
     return fig
 
 
+def plot_fretwork(r):
+    """Fretwork run on our own chart copies (scripts/run_fretwork.sh), same charts both sides."""
+    root = pipeline.DATA / 'references/fretwork_local'
+    if not any(root.glob('*.xlsx')):
+        return None
+    fw = fretwork.by_md5(root, {**r.library, **r.anchors})
+    tiered = [(lab, m) for lab, m in r.labels if m in fw]
+    pool = [m for m in r.pool if m in fw]
+    lat = np.array([r.fit.difficulty[m] for m in pool])
+    pct = lambda v: rankdata(v) / len(v) * 100
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    for col, (tier_score, lb_score, color, label) in enumerate((
+            (r.tier_pred, [r.held_out[m] for m in pool], OURS, 'drumchotic'),
+            (fw, [fw[m] for m in pool], OTHER, 'fretwork'))):
+        tier_panel(axs[0, col], [lab.tier for lab, _ in tiered], [tier_score[m] for _, m in tiered],
+                   f'{label}  ·  tiers {tier_accuracy(tiered, tier_score):.1%} in order')
+        ax = axs[1, col]
+        density(ax, pct(lat), pct(lb_score), color)
+        ax.plot([0, 100], [0, 100], color=INK_2, lw=1, ls='--')
+        ax.set(title=f'{label}  ·  leaderboard Spearman {spearmanr(lat, lb_score)[0]:.3f}',
+               xlabel='leaderboard (percentile)', ylabel=f'{label} (percentile)')
+    axs[0, 0].set_ylabel('drumchotic score')
+    axs[0, 1].set_ylabel('fretwork score')
+    return fig
+
+
 PLOTS = {
     'tiers': plot_tiers,
     'tournaments': plot_tournaments,
@@ -275,6 +302,7 @@ PLOTS = {
     'hardest': plot_hardest,
     'axes': plot_axes,
     'features': plot_features,
+    'fretwork': plot_fretwork,
 }
 
 
@@ -300,6 +328,9 @@ def render(r, names=()):
         if names and name not in names:
             continue
         fig = fn(r)
+        if fig is None:
+            print(f'skipped {name} (no data)')
+            continue
         fig.tight_layout()
         fig.savefig(out / f'{name}.png', dpi=130)
         plt.close(fig)
