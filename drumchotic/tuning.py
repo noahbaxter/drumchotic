@@ -30,3 +30,11 @@ REACH_COST = 3.0
 CYMBAL_HEIGHT = 0.5
 # Yellow cymbals may go to a left crash instead of the hi-hat, whichever plays easier.
 LEFT_CRASH = True
+
+# ---- FEATURES: what gets measured from a chart (drumchotic/measure/features.py)
+# Notes inside roll lanes: 'half' keeps every other note (the speed actually needed
+# to not miss), 'skip' drops them, 'full' counts every note.
+ROLL_MODE = 'half'
+# 2x kick notes are opt-in (Expert+). '2x' counts them, as if played on a double pedal;
+# '1x' drops them, as if played on Expert with one pedal.
+KICK_MODE = '2x'
