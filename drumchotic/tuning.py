@@ -68,3 +68,13 @@ ROLL_MODE = 'half'
 # 2x kick notes are opt-in (Expert+). '2x' counts them, as if played on a double pedal;
 # '1x' drops them, as if played on Expert with one pedal.
 KICK_MODE = '2x'
+
+# ---- PLAYERS: the leaderboard fit that produces training targets (drumchotic/fit/players.py)
+# Pull on chart and player terms toward 0 (bigger = more cautious with few scores).
+PRIOR = 1.0
+# Scores this many deviations worse than expected get downweighted (bad runs, wrong difficulty).
+ROBUST = 1.5
+# Scores under this percent are ignored outright: quits, wrong difficulty, single pedal on 2x.
+MIN_PERCENT = 70
+# Tournament finishes relative to leaderboard scores. A nudge, not ground truth.
+T_WEIGHT = 5.0
