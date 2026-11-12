@@ -6,11 +6,15 @@ sustained sections. Density and endurance work on fixed-length chunks of the
 chart's playing time instead, so they describe the whole chart, not its peak.
 """
 import collections
+import hashlib
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
 from . import sticking
+from .. import tuning
+from ..chart import model
 from ..chart.model import DrumChart, Hit, Pad
 from ..chart.tempo import TempoMap
 from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, LIMB_GRAM, LINEAR_MS, MIN_CHUNK_S,
@@ -84,8 +88,40 @@ def off_grid(ticks, res):
 
 
 def strokes_of(o):
-    """The easiest sticking for every onset with a hand note."""
-    return sticking.assign([(float(o.t[i]), o.surfaces[i]) for i in np.where(o.has_hand)[0]])[0]
+    """The easiest sticking for every onset with a hand note. Cached on disk when a feature build
+    turns the cache on (use_stroke_cache): sticking is about 90% of measuring time."""
+    notes = [(float(o.t[i]), o.surfaces[i]) for i in np.where(o.has_hand)[0]]
+    if STROKE_CACHE is None:
+        return sticking.assign(notes)[0]
+    # keyed by exactly what goes in (the notes) plus the sticking code and knobs, so any change to
+    # parsing or sticking misses the cache instead of reading a stale assignment
+    path = STROKE_CACHE / f'{hashlib.sha1((_STICKING_KEY + repr(notes)).encode()).hexdigest()}.npz'
+    if path.exists():
+        a = np.load(path)
+        return [sticking.Stroke(float(t), int(s), int(h), float(c), int(r))
+                for t, s, h, c, r in zip(a['t'], a['surface'], a['hand'], a['cost'], a['run'])]
+    strokes = sticking.assign(notes)[0]
+    tmp = path.with_suffix('.tmp.npz')
+    np.savez(tmp, t=np.array([s.time_ms for s in strokes], float), surface=np.array([s.surface for s in strokes], np.int8),
+             hand=np.array([s.hand for s in strokes], np.int8), cost=np.array([s.cost for s in strokes], float),
+             run=np.array([s.run for s in strokes], np.int16))
+    tmp.replace(path)
+    return strokes
+
+
+STROKE_CACHE = None
+_STICKING_KEY = ''
+
+
+def use_stroke_cache(folder):
+    """Turn on the on-disk sticking cache for this process (feature builds call it per worker)."""
+    global STROKE_CACHE, _STICKING_KEY
+    STROKE_CACHE = Path(folder)
+    STROKE_CACHE.mkdir(parents=True, exist_ok=True)
+    tuning_text = Path(tuning.__file__).read_text()
+    knobs = tuning_text.split('# ---- STICKING')[1].split('# ---- FEATURES')[0]
+    code = Path(sticking.__file__).read_text() + Path(model.__file__).read_text()
+    _STICKING_KEY = hashlib.sha1((knobs + code).encode()).hexdigest()
 
 
 def compute(chart):

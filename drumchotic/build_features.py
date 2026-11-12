@@ -55,7 +55,8 @@ def main(argv):
         print(f'{out} up to date')
         return
     result, errors = {}, []
-    with ProcessPoolExecutor() as ex:
+    # hand assignments are cached per chart next to the feature caches (see features.strokes_of)
+    with ProcessPoolExecutor(initializer=features.use_stroke_cache, initargs=(out.parent / 'strokes',)) as ex:
         for row, err in ex.map(one, folders, chunksize=16):
             if err:
                 errors.append(err)
