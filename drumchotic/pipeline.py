@@ -59,7 +59,8 @@ class Results:
 
     def shares(self, ms):
         """Each axis's slice of difficulty above the intercept, {axis: array}. With the power mean
-        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept."""
+        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept,
+        less the length discount on long charts."""
         p = self.model.power
         a = np.array([[self.axes[x][m] for m in ms] for x in AXES])
         S = (a ** p).sum(0) ** (1 / p)

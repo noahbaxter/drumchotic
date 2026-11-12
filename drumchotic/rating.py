@@ -68,6 +68,7 @@ class Rater:
     def rate(self, feats):
         axis = {a: float(v[0]) for a, v in self.r.model.axis_scores([feats]).items()}
         score = float(self.r.model.predict([feats])[0])
+        length = float(self.r.model.length_term([feats])[0])
         pos = int(np.searchsorted(self.sorted_pred, score))
         peers = self.order[max(0, pos - PEERS):pos + PEERS]
         rows = []
@@ -79,6 +80,7 @@ class Rater:
             'score': score,
             'level': self.level(score),
             'charter': self.charter(score),
+            'length_tiers': length * self.level.slope,
             'axes': rows,
         }
 

@@ -7,18 +7,22 @@ readable and lets them extrapolate past the hardest charts with scores.
 
 Axes combine as a power mean,  d = b + (sum_a axis_a ** p) ** (1 / p):
 p = 1 adds them up, larger p lets the hardest axis dominate.
+On top of that, an optional length discount: d += slope * max(log(length / typical length), 0).
 """
 import numpy as np
 from scipy.optimize import lsq_linear, minimize
 
-from ..tuning import AXES, AXIS_POWER, AXIS_SCALE, KNOTS, RIDGE
+from ..tuning import AXES, AXIS_POWER, AXIS_SCALE, KNOTS, LENGTH_DISCOUNT, RIDGE
 
 
 class AxisModel:
-    def __init__(self, power=AXIS_POWER, axes=None):
-        """axes: {axis: [features]} to fit, default every axis in tuning.AXES."""
+    def __init__(self, power=AXIS_POWER, axes=None, length=LENGTH_DISCOUNT):
+        """axes: {axis: [features]} to fit, default every axis in tuning.AXES.
+        length: fit the length discount, as tuning.LENGTH_DISCOUNT."""
         self.power = power
         self.axes = AXES if axes is None else axes
+        self.length = length
+        self.length_slope, self.typical_log_length = 0.0, 0.0
 
     def fit(self, feats, y, weights=None):
         """feats: list of feature dicts; y: target difficulty."""
@@ -53,7 +57,27 @@ class AxisModel:
             z = minimize(f, z, jac=True, method='L-BFGS-B',
                          bounds=[(None, None)] + [(0, None)] * B.shape[1]).x
         self.intercept, self.coef = float(z[0]), z[1:]
+        if self.length:
+            self._fit_length(feats, y, w2)
         return self
+
+    def _fit_length(self, feats, y, w):
+        """Weighted least squares of what the axes leave over on the length term, slope held <= 0."""
+        logs = np.log([f['length_s'] for f in feats])
+        self.typical_log_length = float(np.median(logs))
+        x = self._length_x(feats)
+        r = y - self.predict(feats)
+        xm, rm = np.average(x, weights=w), np.average(r, weights=w)
+        slope = np.average((x - xm) * (r - rm), weights=w) / max(np.average((x - xm) ** 2, weights=w), 1e-12)
+        self.length_slope = min(float(slope), 0.0)
+        self.intercept += rm - self.length_slope * xm
+
+    def _length_x(self, feats):
+        return np.maximum(np.log([f['length_s'] for f in feats]) - self.typical_log_length, 0.0)
+
+    def length_term(self, feats):
+        """What length adds to each chart's difficulty (<= 0 for charts longer than typical)."""
+        return self.length_slope * self._length_x(feats)
 
     def _basis(self, feats):
         cols, out = [], []
@@ -74,4 +98,4 @@ class AxisModel:
 
     def predict(self, feats):
         ax = np.column_stack(list(self.axis_scores(feats).values()))
-        return self.intercept + (ax ** self.power).sum(1) ** (1 / self.power)
+        return self.intercept + (ax ** self.power).sum(1) ** (1 / self.power) + self.length_term(feats)

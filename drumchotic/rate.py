@@ -101,6 +101,8 @@ def chart_rows(rater, rated, limit, detail):
                      f"  {fit(title, width):{width}}  {why}".rstrip())
         if detail:
             lines += [f"{'':40}{a:22} library {lib:3.0f}%   at its tier {peer:3.0f}%" for a, lib, peer in res['axes']]
+            if round(res['length_tiers'], 1):
+                lines.append(f"{'':40}{'length':22} {res['length_tiers']:+.1f} tiers (long charts rate easier)")
     if limit and len(rated) > limit:
         lines.append(f'       ... {len(rated) - limit} easier charts not shown')
     return lines

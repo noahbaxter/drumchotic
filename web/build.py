@@ -63,6 +63,7 @@ def build():
     for lab, m in r.labels:
         tiers[m].append([lab.group, lab.tier])
     pool = set(r.pool)
+    length = r.model.length_term([r.features[m] for m in lib]) * rater.level.slope
     charts = []
     for i, m in enumerate(lib):
         artist, title = library_title(r, m)
@@ -78,6 +79,7 @@ def build():
             'n': int(r.fit.n_scores.get(m, 0)),
             'tn': tiers.get(m, []),
             'sh': [round(float(sh[a][i]), 3) for a in axes],
+            'ln': round(float(length[i]), 2),
             'why': why[i],
         })
     groups = sorted({g for v in tiers.values() for g, _ in v})

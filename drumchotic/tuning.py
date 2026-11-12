@@ -92,6 +92,11 @@ AXIS_POWER = 2.0
 # matter more than the scores say, 0 to switch it off. Applied before AXIS_POWER.
 # Axes not listed stay at 1, e.g. {'kick stamina': 1.5}.
 AXIS_SCALE = {}
+# Long charts rate easier than their axes say: a miss costs a smaller share of percent on a long
+# song. One slope on log seconds past the training charts' median length, fit after the axes and
+# never positive, so only charts longer than typical move. Held-out: leaderboard 0.908 -> 0.912,
+# tiers flat, community 96% -> 100%.
+LENGTH_DISCOUNT = True
 # Which features feed each axis.
 AXES = {
     'speed': ['max_nps'],

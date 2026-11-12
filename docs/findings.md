@@ -3,7 +3,7 @@
 What we measured, what we tried, and what it showed, so nothing has to be rediscovered. Newest first within each section. Plans and feedback live in BACKLOG.md.
 
 ## Where the model stands (2026-11-11, feature/v2)
-- Leaderboard: held-out Spearman 0.908 over 7,279 charts. DMT tiers in order: 0.932 (15 tournaments). Community claims: 51 of 53 pairs (96%).
+- Leaderboard: held-out Spearman 0.912 over 7,279 charts. DMT tiers in order: 0.932 (15 tournaments). Community claims: 53 of 53 pairs (100%). With the length discount; without it 0.908 / 0.932 / 96%.
 - Library: 17,976 charts with expert drums out of 31,898 unique charts on the NAS (the rest have no drums track). 2 charts have a drums track with nothing to play; they rate as easiest.
 - The hardest charts are meme or impossible charts (Snailfetus, ExileLord Soulless 4 and 5, quadruple kick demos), up to tier 21.
 
@@ -18,6 +18,12 @@ What we measured, what we tried, and what it showed, so nothing has to be redisc
 - Endurance is not underrated against the leaderboard (armchair thought it was). Charts with the longest dense stretches are slightly overrated (top 5%: model 0.06 too hard, about 3 se). Length is the strongest leftover signal: rank corr -0.23 between chart length and (leaderboard minus model), so long charts are rated too hard. Percent scoring forgives fatigue; endurance mostly costs the FC.
 - Every axis has a small negative correlation (-0.05 to -0.07) with the miss: the model slightly overrates charts that are hard on anything.
 - Chops charts (Matt McGuire, Luke Holland, Xane60 remixes) read easier than players find them: held-out mean 0.12 vs leaderboard 0.45. About a third of that gap is leaderboard bias (length and kick-heavy charts); tournament tiers show no hand-heavy vs kick-heavy bias. Pop punk (Rise Against) -0.57 vs -0.67, about right.
+
+## Length, silence and average NPS (2026-11-11)
+- Built in as a hinge (tuning.LENGTH_DISCOUNT): only charts longer than the training median (222 s) are discounted, slope -0.237 per log second past it. Against the straight line (-0.186, which also lifts short charts): leaderboard 0.9116 vs 0.9124, tiers 0.9319 vs 0.9313, community both 53/53, all inside noise. Held-out mean miss by length (off, then on): under 222 s -0.07 / -0.03, 222 to 400 s +0.02 / +0.01, 400 to 900 s +0.15 / 0.00, 900 to 1800 s +0.32 / -0.03, 1800 s+ +0.59 / +0.05. Full albums take up to 1.8 tiers off (BTBAM Colors), discographies about 3.
+- Silence doesn't change difficulty per the leaderboard: playing share, longest rest, rests over 2 s and total rest time all correlate -0.04 to -0.01 with the model's miss. Near-empty charts already land at tier 0 to 0.6 (4'33", Nirvana Polly, jingles). Mostly-silent charts with real playing rate by what's played, and the leaderboard agrees.
+- Average NPS (notes over the whole span, gaps included) adds nothing: 0.908 with or without it, as an axis or inside density or endurance; alone 0.686 vs density 0.864. Most charts play 92 to 100% of their span, so it's nearly density. Good for explaining axes (speed = max, density = median, average = overall), not for the model.
+- What the misses do follow is amount: total notes (-0.22) and span (-0.21). A length correction (log seconds, fit inside each fold on training charts only, on top of the axis model): leaderboard 0.908 to 0.912, tiers 0.932 to 0.931 (flat), community 96% to 100% (the two Car Bomb misses come right). Slope -0.186 per log second: doubling a song's length costs about 0.13 model units, about a third of a tier; album-length charts about half a tier. Notes instead of seconds: 0.913 / 0.929 / 98%. Fits the stated target (accuracy: a miss is a smaller share of percent on a long song); for FCs length cuts the other way.
 
 ## Is sticking worth it (2026-11-11)
 - Without the sticking axis: leaderboard 0.908 to 0.905, tiers 0.932 to 0.934 (inside noise). Without sticking and movement (both come from the hand assignment): leaderboard 0.900, about three times the noise. Alone: sticking 0.801, movement 0.682. Modest but real; keep it, and judge the sticking rework against these numbers.

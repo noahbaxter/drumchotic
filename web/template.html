@@ -217,7 +217,8 @@ function hideTip() { tip.style.display = 'none'; }
 function chartTip(c) {
   return `<b>${c.name}</b><br><span class="m">drumchotic tier ${c.lv.toFixed(1)}, diff ${c.ch.toFixed(1)} │ human diff ${c.r ?? '-'} · ${c.n} plays</span>`
     + (c.tn.length ? `<br><span class="m">${tierText(c)}</span>` : '')
-    + (c.why.length ? `<br>hard for: ${c.why.map(i => AXES[i]).join(', ')}` : '');
+    + (c.why.length ? `<br>hard for: ${c.why.map(i => AXES[i]).join(', ')}` : '')
+    + (c.ln <= -0.05 ? `<br><span class="m">length ${c.ln.toFixed(1)} tiers (long charts rate easier)</span>` : '');
 }
 
 // histogram: level, or diff with each DMT tier's median diff marked
@@ -531,7 +532,7 @@ function drawAxes(sel) {
       svgMark(svg, W, H, s ? x(s[0]) : m.l, Math.max(s ? x(s[2]) : 0, x(libMed[a])) + 44, m.t + row * k));
   });
   hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); light(null); });
-  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "share of each chart's total (a chart's axes add up to how hard the model rates it)";
+  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "share of each chart's total (a chart's axes add up to how hard the model rates it, before the length discount on long charts)";
 }
 
 // table
