@@ -8,6 +8,7 @@ and the axes that make each chart hard. Fit to DMBot leaderboard scores.
 ```
 scripts/rate.sh --help                       # every option, and how to read the report
 scripts/rate.sh ~/path/to/charts             # rate chart folders on disk
+scripts/rate.sh --artist "car bomb"          # or --search, --top N
 ```
 
 Model work (knobs in `drumchotic/tuning.py`):

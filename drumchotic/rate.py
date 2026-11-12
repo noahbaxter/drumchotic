@@ -8,6 +8,12 @@ WHAT TO RATE (combine as many as you like, each gets its own block)
                             anything with a notes.mid or notes.chart: your downloads, your own
                             charts, a single song. It does not need to be on a leaderboard or
                             in a tournament. Paths are relative to where you ran the script.
+  --artist NAME [NAME ...]  each artist's charts from the library
+  --search TEXT             library charts whose artist or title contains TEXT
+  --top N                   the N hardest charts in the library
+  "The library" means every chart drumchotic already knows: leaderboard songs and tournament
+  setlists. Matching ignores case and works on whole words ("dahlia" finds "The Black Dahlia
+  Murder", "dahl" doesn't).
 
 READING THE REPORT
   Two column groups, drumchotic's call and the human one, each with a tier and a diff:
@@ -46,7 +52,8 @@ LIMITS
 EXAMPLES
   scripts/rate.sh ~/"Clone Hero/Songs"
   scripts/rate.sh ~/Downloads/new-charts --limit 20
-  scripts/rate.sh ~/Downloads/new-charts --detail
+  scripts/rate.sh --artist "black dahlia murder" "hail the sun" --limit 15
+  scripts/rate.sh --top 25 --detail
 """
 import argparse
 import collections
@@ -59,7 +66,7 @@ import numpy as np
 
 from .chart import song
 from .measure import features
-from .rating import REASONS_SHOWN, Rater, charter_rating, reasons
+from .rating import REASONS_SHOWN, Rater, charter_rating, library_title, reasons
 
 TITLE_WIDTH = 48       # longer titles are cut
 PACKED = ('.sng', '.zip', '.rar', '.7z')    # chart downloads this can't open yet
@@ -117,8 +124,54 @@ def group(rater, name, rated, limit, detail):
     return [head, '=' * len(head)] + summary(rated) + [''] + chart_rows(rater, rated, limit, detail) + ['', '']
 
 
+def library_row(rater, m, title=None):
+    """(title, folder, rating) for a library chart, 'artist - name' unless given a title."""
+    r = rater.r
+    if title is None:
+        title = ' - '.join(library_title(r, m))
+    return title, r.library[m]['folder'], rater.rate(r.features[m])
+
+
 def hardest_first(rated):
     return sorted(rated, key=lambda x: -x[2]['score'])
+
+
+def whole_words(text):
+    return re.compile(r'\b' + re.escape(text.strip()) + r'\b', re.IGNORECASE)
+
+
+def by_artist(rater, names, limit, detail):
+    r = rater.r
+    titles = {m: library_title(r, m) for m in r.library}
+    out = []
+    for name in names:
+        words = whole_words(name)
+        hits = [m for m in r.library if words.search(titles[m][0])]
+        if not hits:
+            out += [f'no library chart by an artist matching "{name}"', '']
+            continue
+        shown_name = collections.Counter(titles[m][0] for m in hits).most_common(1)[0][0]
+        same = lambda a: a.lower() == shown_name.lower()
+        rated = hardest_first(library_row(rater, m, titles[m][1] if same(titles[m][0])
+                                          else f'{titles[m][0]} - {titles[m][1]}') for m in hits)
+        out += group(rater, shown_name, rated, limit, detail)
+    return out
+
+
+def by_title(rater, query, limit, detail):
+    r = rater.r
+    words = whole_words(query)
+    hits = [m for m in r.library if words.search(r.name(m))]
+    if not hits:
+        return [f'no library chart matches "{query}"', '']
+    return group(rater, f'"{query}"', hardest_first(library_row(rater, m) for m in hits), limit, detail)
+
+
+def by_top(rater, n, detail):
+    """The n hardest library charts."""
+    r = rater.r
+    hardest = sorted(r.library, key=lambda m: -r.pred[m])[:n]
+    return group(rater, f'hardest {n} charts', [library_row(rater, m) for m in hardest], None, detail)
 
 
 def by_folder(rater, root, limit, detail):
@@ -159,7 +212,9 @@ LEGEND = [
 
 
 def report_path(a):
-    names = [Path(f).name for f in a.folders]
+    names = (([f'top {a.top}'] if a.top else [])
+             + (a.artist or []) + ([a.search] if a.search else [])
+             + [Path(f).name for f in a.folders])
     slug = re.sub(r'[^a-z0-9]+', '-', ' '.join(names).lower()).strip('-')[:60] or 'ratings'
     return REPORTS / f"{datetime.now():%Y-%m-%d_%H%M%S}_{slug}.txt"
 
@@ -168,18 +223,28 @@ def main():
     p = argparse.ArgumentParser(prog='scripts/rate.sh', description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('folders', nargs='*', metavar='FOLDER', help='chart folders on disk, searched recursively')
+    p.add_argument('--artist', nargs='+', metavar='NAME', help="each artist's library charts")
+    p.add_argument('--search', metavar='TEXT', help='library charts whose artist or title matches')
+    p.add_argument('--top', type=int, metavar='N', help='the N hardest library charts')
     p.add_argument('--limit', type=int, metavar='N', help='show only the N hardest of each block')
     p.add_argument('--detail', action='store_true', help='list every axis under each chart, not just stand-outs')
     p.add_argument('--out', type=Path, metavar='FILE', help='save the report here instead of data/ratings/')
     a = p.parse_args()
-    if not a.folders:
+    if not (a.folders or a.artist or a.search or a.top):
         p.print_usage()
-        p.exit(2, 'nothing to rate: give a folder (--help explains everything)\n')
+        p.exit(2, 'nothing to rate: give a folder or one of --artist, --search, --top '
+                  '(--help explains everything)\n')
     caller = Path(os.environ.get('RATE_CWD', '.'))
     a.folders = [caller / f for f in a.folders]
     a.out = caller / a.out if a.out else None
     rater = Rater()
     lines = []
+    if a.top:
+        lines += by_top(rater, a.top, a.detail)
+    if a.artist:
+        lines += by_artist(rater, a.artist, a.limit, a.detail)
+    if a.search:
+        lines += by_title(rater, a.search, a.limit, a.detail)
     for root in a.folders:
         lines += by_folder(rater, root, a.limit, a.detail)
     text = '\n'.join(lines + LEGEND) + '\n'
