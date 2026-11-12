@@ -62,6 +62,7 @@ def build():
     tiers = collections.defaultdict(list)
     for lab, m in r.labels:
         tiers[m].append([lab.group, lab.tier])
+    rock_band = {lab.md5: [lab.tier, lab.source] for lab in r.rock_band}
     pool = set(r.pool)
     length = r.model.length_term([r.features[m] for m in lib]) * rater.level.slope
     charts = []
@@ -71,7 +72,9 @@ def build():
         charts.append({
             'a': artist, 't': title, 's': search_text(r.library[m]['folder']),
             'd': round(float(r.pred[m]), 3),
-            'lv': round(rater.level(r.pred[m]), 2),
+            'lv': round(rater.level(r.pred[m], floor=None), 2),
+            'rbv': round(rater.rock_band(r.pred[m], floor=None), 2),
+            'rb': rock_band.get(m),
             'ch': round(rater.charter(r.pred[m]), 2),
             'r': rated if rated >= 0 else None,
             'lb': round(float(r.fit.difficulty[m]), 3) if m in pool else None,
@@ -84,7 +87,13 @@ def build():
         })
     groups = sorted({g for v in tiers.values() for g, _ in v})
     medians = [[int(t), round(rater.charter(v), 3)] for t, v in zip(rater.level.levels, rater.level.medians)]
-    data = {'axes': axes, 'groups': groups, 'charts': charts, 'tierMedians': medians, 'started': tournament_dates(),
+    # per reference (DMT tournaments, official Rock Band): each human tier's median on its own scale, for
+    # the histogram's markers; toDmt turns a Rock Band scale value into a DMT tier, so colours match
+    lv, rb = rater.level, rater.rock_band
+    refs = {'dmt': {'marks': [[int(t), round(lv(v), 3)] for t, v in zip(lv.levels, lv.medians)]},
+            'rb': {'marks': [[int(t), round(rb(v), 3)] for t, v in zip(rb.levels, rb.medians)],
+                   'toDmt': [round(lv.intercept - lv.slope * rb.intercept / rb.slope, 4), round(lv.slope / rb.slope, 4)]}}
+    data = {'axes': axes, 'groups': groups, 'charts': charts, 'tierMedians': medians, 'refs': refs, 'started': tournament_dates(),
             'built': f'{datetime.now():%Y-%m-%d}'}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     DATA.write_text(json.dumps(data, separators=(',', ':')))

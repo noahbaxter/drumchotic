@@ -16,7 +16,7 @@ from .fit import players
 from .fit.axes import AxisModel
 from .fit.metrics import tier_accuracy
 from .measure import familiarity
-from .sources import dmt, leaderboard, tournaments
+from .sources import dmt, leaderboard, rockband, tournaments
 from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
 DATA = Path('data')
@@ -51,6 +51,7 @@ class Results:
     songs: dict          # md5 -> leaderboard.Song
     fit: players.Fit     # leaderboard difficulty and player skill
     labels: list         # [(dmt.Label, md5)]
+    rock_band: list      # [rockband.Label]: official Rock Band drum tiers
     pool: list           # md5s used as training targets
     held_out: dict       # md5 -> prediction from a model that never saw that chart (pool only)
     tier_pred: dict      # md5 -> prediction from a model trained without any DMT chart
@@ -162,4 +163,4 @@ def run():
     allm = list(F)
     pred = dict(zip(allm, model.predict([F[m] for m in allm])))
     axes = {a: dict(zip(allm, v)) for a, v in model.axis_scores([F[m] for m in allm]).items()}
-    return Results(library, anchors, F, songs, fit, labels, pool, held_out, tier_pred, model, pred, axes)
+    return Results(library, anchors, F, songs, fit, labels, rockband.load(library), pool, held_out, tier_pred, model, pred, axes)

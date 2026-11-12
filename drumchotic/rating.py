@@ -33,7 +33,8 @@ class Scale:
         self.medians = np.maximum.accumulate([np.median(s[lab == v]) for v in levels])
         self.slope, self.intercept = np.polyfit(self.medians, self.levels, 1)
 
-    def __call__(self, x):
+    def __call__(self, x, floor=0.0):
+        """floor None lets the easiest charts read below 0 (the explorer's histogram)."""
         lv, md = self.levels, self.medians
         if LINEAR_SCALE:
             v = self.intercept + self.slope * x
@@ -43,7 +44,7 @@ class Scale:
             v = lv[0] - (md[0] - x) / max(md[1] - md[0], 1e-9) * (lv[1] - lv[0])
         else:
             v = np.interp(x, md, lv)
-        return max(0.0, float(v))
+        return float(v) if floor is None else max(floor, float(v))
 
 
 class Rater:
@@ -61,6 +62,8 @@ class Rater:
         self.charter = Scale(*zip(*rated))
         self.level = Scale(*zip(*[(r.tier_pred[m], lab.modern) for lab, m in r.labels
                                   if m in r.tier_pred and lab.modern is not None]))
+        # official Rock Band tiers: the leaderboard can't order the easy end, Rock Band's setlists do
+        self.rock_band = Scale(*zip(*[(r.pred[lab.md5], lab.tier) for lab in r.rock_band]))
         self.placed = collections.defaultdict(set)    # md5 -> tiers tournaments placed it in
         for lab, m in r.labels:
             self.placed[m].add(lab.tier)
