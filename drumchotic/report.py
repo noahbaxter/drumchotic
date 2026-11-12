@@ -8,7 +8,8 @@ import numpy as np
 from scipy.stats import spearmanr
 
 from . import pipeline
-from .fit.metrics import tier_accuracy
+from .fit.metrics import community_accuracy, tier_accuracy
+from .sources import community
 from .tuning import AXES
 
 
@@ -26,7 +27,16 @@ def show(r, n_out=15):
     print(f'DMT tiers in the right order (DMT held out): {tier_accuracy(r.labels, r.tier_pred):.3f}')
     print(f'leaderboard difficulty vs held-out prediction: Spearman '
           f'{spearmanr(*r.pool_scores())[0]:.3f} over {len(r.pool)} charts')
-    print(f'leaderboard fit only, DMT tiers: {tier_accuracy(r.labels, d):.3f}\n')
+    print(f'leaderboard fit only, DMT tiers: {tier_accuracy(r.labels, d):.3f}')
+    # held out where the chart is in the leaderboard pool, so claims about scored charts aren't graded on training data
+    pairs, missing = community.pairs(community.load(), {m: r.name(m) for m in r.library})
+    acc, wrong = community_accuracy(pairs, {m: r.held_out.get(m, pred[m]) for m in r.library})
+    print(f'community claims in the right order: {acc:.3f} over {len(pairs)} pairs')
+    for c, h, e in wrong:
+        print(f'  wrong: {r.name(h)} should beat {r.name(e)}  ({c.source})')
+    for t in missing:
+        print(f'  no library chart for: {t}')
+    print()
 
     print('Hardest 20:')
     for m in sorted(r.library, key=lambda m: -pred[m])[:20]:

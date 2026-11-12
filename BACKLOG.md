@@ -27,7 +27,8 @@ Community feedback and tuning ideas, newest first. Source in brackets.
 - [ ] TDEP style charts (Dillinger) trick the model. [armchair]
 
 ## Evaluation
-- [ ] Community pairs file: gut-check orderings as a third scorecard next to leaderboard and tiers, e.g. Car Bomb: Cenotaph, Infinite Sun and Naked Fuse are the bottom three; The Seconds, Spirit of Poison, This Will Do The Job, Gum Under the Table, His Eyes, Recursive Patterns, M^6, Rid, Malpractice belong at the top. [armchair]
+- [x] Community claims as a third scorecard (labels/community.txt, printed by report). Car Bomb from armchair: 51 of 53 pairs right.
+- [ ] Add more community claims as they come in (one "@ artist | who, where" block each).
 - [ ] FC target from is_fc, as its own readout (one awkward spot kills an FC but barely moves percent). [Half-Gallon]
 - [ ] A variant without burst axes, closer to how stage tour rates. [Half-Gallon]
 

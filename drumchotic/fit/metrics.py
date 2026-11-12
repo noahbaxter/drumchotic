@@ -26,3 +26,11 @@ def tier_accuracy(labels, score):
             groups[lab.group].append((lab.tier, score[md5]))
     n = sum(map(len, groups.values()))
     return sum(pairwise(*zip(*v)) * len(v) for v in groups.values()) / n
+
+
+def community_accuracy(pairs, score):
+    """Share of community (harder, easier) pairs the score orders the same way, and the pairs it
+    gets wrong. pairs: [(claim, harder md5, easier md5)]; score: md5 -> value."""
+    used = [(c, h, e) for c, h, e in pairs if h in score and e in score]
+    wrong = [p for p in used if score[p[1]] <= score[p[2]]]
+    return (1 - len(wrong) / len(used) if used else float('nan')), wrong
