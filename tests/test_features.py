@@ -38,6 +38,17 @@ class DensityTests(unittest.TestCase):
         for k in ('density_p50', 'density_p75', 'density_p90'):
             self.assertAlmostEqual(tight[k], gapped[k], places=6, msg=k)
 
+    def test_joke_tempo_cannot_make_one_note_dense(self):
+        lone = DrumChart('test', TrackType.FOUR_LANE, True, RES, [Hit(RES * 100, 2000.0, Pad.KICK)],
+                         tempos=[(0, 433433.433)])
+        f = features.compute(lone)
+        self.assertLess(f['density_p90'], 3)
+        self.assertEqual(f['endurance_share_n8'], 0)
+
+    def test_empty_drum_track_rates_as_nothing_to_play(self):
+        f = features.compute(chart([]))
+        self.assertEqual({k for k, v in f.items() if v}, {'length_s'})
+
 
 class EnduranceTests(unittest.TestCase):
     def test_playing_the_chart_twice_does_not_raise_endurance(self):

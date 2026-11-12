@@ -11,10 +11,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import sticking
-from ..chart.model import Pad
+from ..chart.model import DrumChart, Hit, Pad
 from ..chart.tempo import TempoMap
-from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, LIMB_GRAM, LINEAR_MS, NOVEL_HISTORY,
-                      REPEAT_WEIGHT, RUNS, SPEED_WINDOW_S, SUSTAINED_WINDOW_S, TRAVEL_CLOSE_MS, WINDOWS_S)
+from ..tuning import (DENSITY_BEATS, DENSITY_QUANTILES, ENDURANCE_NPS, LIMB_GRAM, LINEAR_MS, MIN_CHUNK_S,
+                      NOVEL_HISTORY, REPEAT_WEIGHT, RUNS, SPEED_WINDOW_S, SUSTAINED_WINDOW_S, TRAVEL_CLOSE_MS, WINDOWS_S)
 from .playable import playable
 from .timing import fastest_run, window_sums_at, worst_window
 
@@ -91,7 +91,7 @@ def strokes_of(o):
 def compute(chart):
     hits = playable(chart)
     if not hits:
-        return None
+        return empty_features(chart)
     o = Onsets.of(hits)
     strokes = strokes_of(o)
     f = {}
@@ -109,6 +109,15 @@ def compute(chart):
         'notes': len(chart.hits),     # every note counts toward percent, roll lanes or not
         'rolls': len(chart.rolls),
     })
+    return f
+
+
+def empty_features(chart):
+    """A drum track with nothing to play: every feature at zero, so it rates as easy as it gets."""
+    probe = DrumChart('empty', chart.track_type, chart.pro_marked, chart.resolution,
+                      [Hit(0, 0.0, Pad.KICK, False), Hit(chart.resolution, 500.0, Pad.KICK, False)], tempos=[(0, 120.0)])
+    f = {k: 0.0 for k in compute(probe)}
+    f.update({'length_s': 1.0, 'notes': len(chart.hits), 'rolls': len(chart.rolls)})
     return f
 
 
@@ -138,7 +147,7 @@ def chunks(hits, chart, weights=None):
         counts[h.tick // span] += w
     ks = sorted(counts)
     start = np.array([tempo.ms(k * span) for k in ks])
-    end = np.array([tempo.ms((k + 1) * span) for k in ks])
+    end = np.maximum(np.array([tempo.ms((k + 1) * span) for k in ks]), start + MIN_CHUNK_S * 1000.0)
     return np.array([counts[k] for k in ks]) / ((end - start) / 1000.0), start, end
 
 
@@ -156,7 +165,8 @@ def density_and_endurance(hits, chart, o):
     f = {f'density_p{int(q * 100)}': weighted_quantile(nps, end - start, q) for q in DENSITY_QUANTILES}
     f[f'density_w{SUSTAINED_WINDOW_S}'] = worst_window(o.t, o.weight, SUSTAINED_WINDOW_S)
     dur = (end - start) / 1000.0
-    joined = np.r_[False, np.isclose(start[1:], end[:-1])]   # chunk follows the previous with no gap
+    # chunk follows the previous with no gap (or overlaps it, when MIN_CHUNK_S stretched it)
+    joined = np.r_[False, start[1:] <= end[:-1] + 1e-6]
     for n in ENDURANCE_NPS:
         hot = nps >= n
         f[f'endurance_share_n{n}'] = float(dur[hot].sum() / dur.sum())
