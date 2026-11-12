@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drumchotic explorer</title>
+<style>
+  :root {
+    --surface: #1a1a19; --raised: #222221; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8a897f;
+    --grid: #2c2c2a; --line: #3a3a37; --accent: #3987e5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 24px 8px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--grid);
+         padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field > span, .spot .lbl { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+  input, select { height: 32px; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 6px;
+                  padding: 0 10px; font: inherit; font-size: 13px; }
+  input::placeholder { color: #66655e; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  select { appearance: none; -webkit-appearance: none; padding-right: 28px; cursor: pointer;
+           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238a897f' stroke-width='1.5'/></svg>");
+           background-repeat: no-repeat; background-position: right 10px center; }
+  /* drumchotic | human tier pair, laid out like the table's column groups */
+  .pair { display: flex; }
+  .pair .field { padding: 0 10px; }
+  .pair .field:first-child { padding-left: 0; }
+  .pair .field.sep { border-left: 1px solid var(--line); }
+  #q { width: 300px; }
+  .num { width: 58px; text-align: center; -moz-appearance: textfield; }
+  .num::-webkit-inner-spin-button, .num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  button { font: inherit; cursor: pointer; }
+  #reset { height: 32px; background: none; border: 0; color: var(--ink-3); padding: 0 6px; font-size: 13px; }
+  #reset:hover { color: var(--ink); }
+  main { padding: 16px 24px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 20px; }
+  .panel { min-width: 0; }
+  .panel h2 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
+  .panel h2 span { color: var(--ink-3); font-weight: 400; }
+  .wide { grid-column: 1 / -1; }
+  canvas, svg { display: block; width: 100%; }
+  .tip { position: fixed; pointer-events: none; background: #2a2a28; border: 1px solid var(--line); border-radius: 6px;
+         padding: 6px 9px; font-size: 12px; color: var(--ink); display: none; z-index: 10; max-width: 340px; }
+  .tip b { font-weight: 600; }
+  .tip .m { color: var(--ink-2); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--ink-3); font-weight: 500; font-size: 12px; cursor: pointer; user-select: none; position: sticky; top: var(--bar, 57px); background: var(--surface); }
+  th:hover { color: var(--ink); }
+  td.n, th.n { text-align: right; }
+  td.t { white-space: normal; min-width: 260px; }
+  td.w { color: var(--ink-2); white-space: normal; }
+  .spot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 2px 0 12px; }
+  .spot .seg button { min-width: 42px; font-variant-numeric: tabular-nums; }
+  #thinval { font-size: 12px; color: var(--ink-3); }
+  h1 .built { color: var(--ink-3); font-size: 12px; font-weight: 400; margin-left: 8px; }
+  tr.groups th { cursor: default; position: static; text-align: center; color: var(--ink-2); border-bottom: 0; padding-bottom: 0; }
+  th.sep, td.sep { border-left: 1px solid var(--line); }
+  /* tier numbers wear their difficulty colour (set per cell), diff stays plain */
+  .di { color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; vertical-align: 1px; }
+  .seg button { border: 0; border-radius: 0; padding: 4px 12px; font-size: 13px; background: transparent; color: var(--ink-3); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .more { color: var(--ink-3); padding: 10px 8px; }
+  @media (max-width: 600px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .bar { padding: 10px 16px; } #q { width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>drumchotic explorer <span class="built">built <span id="built"></span></span></h1>
+</header>
+<div class="bar">
+  <label class="field"><span>search, comma = or</span><input id="q" placeholder="artist, title, album, charter, genre, year"></label>
+  <label class="field"><span>tournament</span><select id="tn"></select></label>
+  <div class="pair">
+    <label class="field"><span>drumchotic</span><select id="dt"><option value="">any tier</option></select></label>
+    <label class="field sep"><span>human</span><select id="tier"><option value="">any tier</option></select></label>
+  </div>
+  <label class="field"><span>hard for</span><select id="why"><option value="">anything</option></select></label>
+  <label class="field"><span>min plays</span><input id="ns" class="num" type="number" min="0" step="1" placeholder="0"></label>
+  <button id="reset">reset</button>
+</div>
+<main>
+  <section class="panel"><h2><span class="seg" id="scale"><button data-v="d">diff</button><button data-v="lv">tier</button></span> <span>drumchotic's, filtered charts over the grey shape of the whole library</span></h2><svg id="hist"></svg></section>
+  <section class="panel"><h2>Model vs leaderboard <span id="sp"></span></h2><canvas id="scatter"></canvas></section>
+  <section class="panel wide"><h2>What makes charts hard <span>median and middle half of each axis's share, white tick = whole library median</span></h2><svg id="axes"></svg></section>
+  <section class="panel wide"><h2>Charts <span id="tcount"></span></h2>
+    <div class="spot"><span class="lbl">spot check</span><span class="seg" id="spotseg"></span><span id="thinval"></span>
+      <input type="hidden" id="samples" value="6"></div>
+    <table id="table"></table></section>
+</main>
+<div class="tip" id="tip"></div>
+<script>
+const DATA = /*DATA*/null;
+const {axes: AXES, groups: GROUPS, charts: ALL} = DATA;
+document.getElementById('built').textContent = DATA.built;
+const STOPS = ['#9085e9', '#3987e5', '#1baf7a', '#eda100', '#eb6834', '#e34948'];   // difficulty ramp, as in plots.py
+// the page's primary colour lives in CSS (--accent); charts read it from there
+const ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+const ROWS = 300;   // table rows drawn at a time; scrolling near the end draws the next batch
+let rowsShown = ROWS;
+// spot check slider stops; one past the last means every chart
+const SAMPLE_SIZES = [10, 25, 50, 100, 250, 500];
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+ALL.forEach((c, i) => { c.i = i; c.name = (c.a ? c.a + ' - ' : '') + c.t; c.low = c.name.toLowerCase(); c.find = (c.s || '') + ' ' + c.low; });
+
+function hex(h) { return [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); }
+function levelColor(lv) {
+  const t = Math.min(Math.max((lv - 1) / 7, 0), 1) * (STOPS.length - 1), k = Math.min(Math.floor(t), STOPS.length - 2), f = t - k;
+  const a = hex(STOPS[k]), b = hex(STOPS[k + 1]);
+  return `rgb(${a.map((v, j) => Math.round(v + (b[j] - v) * f)).join(',')})`;
+}
+function median(v) { if (!v.length) return NaN; const s = [...v].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function quantile(s, q) { const p = (s.length - 1) * q, k = Math.floor(p); return s[k] + (s[Math.min(k + 1, s.length - 1)] - s[k]) * (p - k); }
+function ranks(v) {
+  const o = v.map((x, i) => [x, i]).sort((a, b) => a[0] - b[0]), r = new Array(v.length);
+  for (let i = 0; i < o.length;) { let j = i; while (j + 1 < o.length && o[j + 1][0] === o[i][0]) j++; for (let k = i; k <= j; k++) r[o[k][1]] = (i + j) / 2; i = j + 1; }
+  return r;
+}
+function spearman(x, y) {
+  if (x.length < 3) return NaN;
+  const a = ranks(x), b = ranks(y), n = a.length, ma = (n - 1) / 2;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (a[i] - ma) * (b[i] - ma); da += (a[i] - ma) ** 2; db += (b[i] - ma) ** 2; }
+  return num / Math.sqrt(da * db);
+}
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
+function tierText(c) { return c.tn.map(([g, t]) => `T${t} ${g.replace(' Setlist', '')}`).join(', '); }
+
+// filter bar
+$('tn').innerHTML = '<option value="">all charts</option><option value="*">any tournament</option>' + GROUPS.map(g => `<option>${g}</option>`).join('');
+for (let t = 1; t <= 8; t++) $('tier').insertAdjacentHTML('beforeend', `<option value="${t}">tier ${t}</option>`);
+// drumchotic tier: whole steps (5 = 5.0 to 5.9), with everything from 8 up in one
+$('dt').insertAdjacentHTML('beforeend', '<option value="0">tier below 1</option>'
+  + [1, 2, 3, 4, 5, 6, 7].map(t => `<option value="${t}">tier ${t}</option>`).join('') + '<option value="8">tier 8+</option>');
+AXES.forEach((a, i) => $('why').insertAdjacentHTML('beforeend', `<option value="${i}">${a}</option>`));
+const CONTROLS = ['q', 'tn', 'tier', 'dt', 'why', 'ns', 'samples'];
+try { const saved = JSON.parse(localStorage.getItem('drumchotic-filters') || '{}'); CONTROLS.forEach(k => { if (saved[k] != null) $(k).value = saved[k]; }); } catch (e) {}
+// ?q=car+bomb&tn=Icebreaker+2024+Setlist&tier=7 overrides the remembered filters
+const params = new URLSearchParams(location.search);
+if ([...params.keys()].some(k => CONTROLS.includes(k))) CONTROLS.forEach(k => $(k).value = params.get(k) ?? (k === 'samples' ? SAMPLE_SIZES.length : ''));
+CONTROLS.forEach(k => $(k).addEventListener('input', update));
+$('spotseg').innerHTML = [...SAMPLE_SIZES, 'all'].map((n, i) => `<button data-i="${i}">${n}</button>`).join('');
+$('spotseg').querySelectorAll('button').forEach(b => b.onclick = () => { $('samples').value = b.dataset.i; update(); });
+// the table header sticks just under the filter bar, whatever height the bar wraps to
+const barHeight = () => document.documentElement.style.setProperty('--bar', document.querySelector('.bar').offsetHeight + 'px');
+barHeight(); addEventListener('resize', barHeight);
+// clicking into a text box selects what's there, so it can be typed over or deleted at once
+// (after the click finishes, or the mouseup would clear the selection again)
+document.querySelectorAll('.bar input').forEach(i => i.addEventListener('focus', () => setTimeout(() => i.select())));
+$('reset').onclick = () => { CONTROLS.forEach(k => $(k).value = ''); $('samples').value = SAMPLE_SIZES.length; update(); };
+
+function filtered() {
+  const terms = $('q').value.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const tn = $('tn').value, tier = +$('tier').value || 0, why = $('why').value;
+  const dt = $('dt').value, lo = dt === '' ? -Infinity : +dt, hi = dt === '' || dt === '8' ? Infinity : +dt + 1;
+  const ns = +$('ns').value || 0;
+  return ALL.filter(c => {
+    if (terms.length && !terms.some(t => c.find.includes(t))) return false;
+    if (c.lv < lo || c.lv >= hi || c.n < ns) return false;
+    if (why !== '' && !c.why.includes(+why)) return false;
+    if (tn || tier) {
+      const hits = c.tn.filter(([g, t]) => (!tn || tn === '*' || g === tn) && (!tier || t === tier));
+      if (!hits.length) return false;
+    }
+    return true;
+  });
+}
+
+// tooltip
+const tip = $('tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block';
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip() { tip.style.display = 'none'; }
+function chartTip(c) {
+  return `<b>${c.name}</b><br><span class="m">drumchotic tier ${c.lv.toFixed(1)}, diff ${c.ch.toFixed(1)} │ human diff ${c.r ?? '-'} · ${c.n} plays</span>`
+    + (c.tn.length ? `<br><span class="m">${tierText(c)}</span>` : '')
+    + (c.why.length ? `<br>hard for: ${c.why.map(i => AXES[i]).join(', ')}` : '');
+}
+
+// histogram: level, or diff with each DMT tier's median diff marked
+const TM = DATA.tierMedians;   // [tier, median diff]
+function diffToLevel(d) {      // for colouring the diff view like the level view
+  const n = TM.length;
+  if (d <= TM[0][1]) return TM[0][0] - (TM[0][1] - d) / (TM[1][1] - TM[0][1]) * (TM[1][0] - TM[0][0]);
+  if (d >= TM[n - 1][1]) return TM[n - 1][0] + (d - TM[n - 1][1]) / (TM[n - 1][1] - TM[n - 2][1]) * (TM[n - 1][0] - TM[n - 2][0]);
+  for (let k = 1; k < n; k++) if (d <= TM[k][1]) return TM[k - 1][0] + (d - TM[k - 1][1]) / (TM[k][1] - TM[k - 1][1]) * (TM[k][0] - TM[k - 1][0]);
+}
+const HIST_EXAMPLES = 3;   // charts listed when hovering a histogram bar
+let scaleMode = 'd';
+try { scaleMode = localStorage.getItem('drumchotic-view') || 'd'; } catch (e) {}
+document.querySelectorAll('#scale button').forEach(b => b.onclick = () => {
+  scaleMode = b.dataset.v; try { localStorage.setItem('drumchotic-view', scaleMode); } catch (e) {}
+  drawHist(current);
+});
+function drawHist(sel) {
+  document.querySelectorAll('#scale button').forEach(b => b.classList.toggle('on', b.dataset.v === scaleMode));
+  const raw = scaleMode === 'd', key = raw ? (c => c.ch) : (c => c.lv), BIN = raw ? 0.1 : 0.25;
+  const svg = $('hist'), W = svg.clientWidth || 600, H = 300, m = {l: 44, r: 10, t: raw ? 40 : 10, b: 34};
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.innerHTML = '';
+  const vals = ALL.map(key), lo = 0, hi = Math.ceil(Math.max(...vals, raw ? 6 : 9));
+  const nb = Math.ceil((hi - lo) / BIN), bin = v => Math.min(Math.floor((v - lo) / BIN), nb - 1);
+  const all = new Array(nb).fill(0), got = new Array(nb).fill(0), members = Array.from({length: nb}, () => []);
+  ALL.forEach(c => all[bin(key(c))]++);
+  sel.forEach(c => { const b = bin(key(c)); got[b]++; members[b].push(c); });
+  const solo = sel.length < ALL.length, top = Math.max(...(solo ? got : all), 1);
+  // filtered: the library is drawn as its shape, scaled to the same height
+  const libTop = Math.max(...all), shape = v => v / libTop * top;
+  const x = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r), y = v => H - m.b - v / top * (H - m.t - m.b);
+  for (let k = 0; k <= 4; k++) { const v = Math.round(top * k / 4), yy = y(v);
+    el('line', {x1: m.l, x2: W - m.r, y1: yy, y2: yy, stroke: '#2c2c2a'}, svg);
+    el('text', {x: m.l - 6, y: yy + 4, 'text-anchor': 'end', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = v; }
+  for (let v = lo; v <= hi; v++) el('text', {x: x(v), y: H - m.b + 16, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = v;
+  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent =
+    raw ? 'drumchotic diff (dotted lines: its median at each human tier)' : 'drumchotic tier';
+  if (raw) TM.forEach(([t, d], k) => { const xx = x(d), y0 = k % 2 ? 12 : 26;
+    el('line', {x1: xx, x2: xx, y1: y0 + 4, y2: H - m.b, stroke: '#8a897f', 'stroke-dasharray': '2 3'}, svg);
+    el('text', {x: xx, y: y0, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = 'T' + t; });
+  const bw = x(lo + BIN) - x(lo);
+  // band behind the hovered column, drawn first so the bars sit on top of it
+  const band = el('rect', {y: m.t, width: bw, height: H - m.t - m.b, fill: '#f0efec', 'fill-opacity': 0.08, rx: 2, visibility: 'hidden'}, svg);
+  for (let b = 0; b < nb; b++) {
+    const a0 = lo + b * BIN, mid = a0 + BIN / 2, color = levelColor(raw ? diffToLevel(mid) : mid);
+    if (solo && all[b]) el('rect', {x: x(a0) + 1, width: Math.max(bw - 2, 1), y: y(shape(all[b])), height: H - m.b - y(shape(all[b])), fill: '#2c2c2a', rx: 2}, svg);
+    if (got[b]) el('rect', {x: x(a0) + 1, width: Math.max(bw - 2, 1), y: y(got[b]), height: H - m.b - y(got[b]), fill: color, rx: 2}, svg);
+  }
+  // one hover target over the whole plot that snaps to the nearest bar with charts, so no gaps
+  const filled = got.map((v, b) => v ? b : -1).filter(b => b >= 0);
+  const hit = el('rect', {x: m.l, width: W - m.l - m.r, y: 0, height: H - m.b, fill: 'transparent'}, svg);
+  hit.addEventListener('mousemove', e => {
+    if (!filled.length) return;
+    const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) * W / box.width;
+    const at = (px - m.l) / bw, b = filled.reduce((p, q) => Math.abs(q + 0.5 - at) < Math.abs(p + 0.5 - at) ? q : p);
+    const a0 = lo + b * BIN;
+    band.setAttribute('x', x(a0)); band.setAttribute('visibility', 'visible');
+    const examples = [...members[b]].sort((p, q) => q.n - p.n).slice(0, HIST_EXAMPLES)
+      .map(c => `<br>${esc(c.name)} <span class="m">${raw ? 'diff ' + c.ch.toFixed(1) : 'tier ' + c.lv.toFixed(1)}</span>`).join('');
+    showTip(e, `<b>${raw ? 'diff' : 'tier'} ${a0.toFixed(2)} to ${(a0 + BIN).toFixed(2)}</b>`
+      + ` <span class="m">${got[b]} charts${solo ? ` of ${all[b]} in the library` : ''}, most played:</span>${examples}`);
+  });
+  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); });
+}
+
+// model vs leaderboard
+let scatterPts = [];
+function drawScatter(sel) {
+  const cv = $('scatter'), W = cv.clientWidth || 600, H = 300, dpr = devicePixelRatio || 1, m = {l: 44, r: 10, t: 10, b: 34};
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const pool = ALL.filter(c => c.lb != null), lb = pool.map(c => c.lb), ho = pool.map(c => c.ho);
+  const lo = Math.floor(Math.min(...lb, ...ho)), hi = Math.ceil(Math.max(...lb, ...ho));
+  const x = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r), y = v => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
+  g.font = '11px system-ui'; g.fillStyle = '#c3c2b7'; g.strokeStyle = '#2c2c2a';
+  for (let v = lo; v <= hi; v++) { g.beginPath(); g.moveTo(m.l, y(v)); g.lineTo(W - m.r, y(v)); g.stroke();
+    g.textAlign = 'right'; g.fillText(v, m.l - 6, y(v) + 4); g.textAlign = 'center'; g.fillText(v, x(v), H - m.b + 16); }
+  g.font = '12px system-ui'; g.fillText('leaderboard', (W + m.l) / 2, H - 4);
+  g.save(); g.translate(12, (H - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText('model (never saw the chart)', 0, 0); g.restore();
+  g.setLineDash([4, 4]); g.strokeStyle = '#c3c2b7'; g.beginPath(); g.moveTo(x(lo), y(lo)); g.lineTo(x(hi), y(hi)); g.stroke(); g.setLineDash([]);
+  // above the diagonal the model rates a chart harder than its leaderboard, below it easier
+  g.font = '600 11px system-ui'; g.fillStyle = '#8a897f';
+  g.textAlign = 'left'; g.fillText('OVERESTIMATED', m.l + 10, m.t + 14);
+  g.textAlign = 'right'; g.fillText('UNDERESTIMATED', W - m.r - 6, H - m.b - 10);
+  const selSet = new Set(sel.map(c => c.i)), solo = sel.length < ALL.length;
+  g.fillStyle = solo ? '#c3c2b7' : ACCENT; g.globalAlpha = solo ? 0.12 : 0.35;
+  pool.forEach(c => { if (!solo || !selSet.has(c.i)) g.fillRect(x(c.lb) - 1.5, y(c.ho) - 1.5, 3, 3); });
+  g.globalAlpha = 1;
+  scatterPts = [];
+  if (solo) sel.forEach(c => { if (c.lb == null) return; const px = x(c.lb), py = y(c.ho);
+    g.beginPath(); g.arc(px, py, 4, 0, 7); g.fillStyle = levelColor(c.lv); g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1a19'; g.stroke();
+    scatterPts.push([px, py, c]); });
+  else pool.forEach(c => scatterPts.push([x(c.lb), y(c.ho), c]));
+  const pick = sel.filter(c => c.lb != null), rho = spearman(pick.map(c => c.lb), pick.map(c => c.ho));
+  $('sp').textContent = isNaN(rho) ? `${pick.length} on the leaderboard` : `spearman ${rho.toFixed(3)} over ${pick.length} leaderboard charts`;
+}
+$('scatter').addEventListener('mousemove', e => {
+  const b = e.target.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+  let best = null, bd = 100;
+  for (const [px, py, c] of scatterPts) { const d = (px - mx) ** 2 + (py - my) ** 2; if (d < bd) { bd = d; best = c; } }
+  best ? showTip(e, chartTip(best) + `<br><span class="m">leaderboard ${best.lb.toFixed(2)} · model ${best.ho.toFixed(2)}</span>`) : hideTip();
+});
+$('scatter').addEventListener('mouseleave', hideTip);
+
+// axis shares
+function drawAxes(sel) {
+  const svg = $('axes'), W = svg.clientWidth || 900, row = 26, m = {l: 150, r: 60, t: 6, b: 30};
+  const libMed = AXES.map((_, a) => median(ALL.map(c => c.sh[a])));
+  const order = AXES.map((_, a) => a).sort((p, q) => libMed[q] - libMed[p]);
+  const H = m.t + m.b + row * AXES.length;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.innerHTML = '';
+  const stats = AXES.map((_, a) => { const s = sel.map(c => c.sh[a]).sort((p, q) => p - q);
+    return s.length ? [quantile(s, 0.25), quantile(s, 0.5), quantile(s, 0.75)] : null; });
+  const top = Math.max(...stats.filter(Boolean).map(s => s[2]), ...libMed, 0.01) * 1.08;
+  const x = v => m.l + v / top * (W - m.l - m.r);
+  for (let k = 0; k <= 4; k++) { const v = top * k / 4;
+    el('line', {x1: x(v), x2: x(v), y1: m.t, y2: H - m.b, stroke: '#2c2c2a'}, svg);
+    el('text', {x: x(v), y: H - m.b + 16, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = v.toFixed(2); }
+  const total = sel.length ? median(sel.map(c => c.sh.reduce((p, q) => p + q, 0))) : 0;
+  // band behind the hovered row, drawn first so the marks sit on top of it
+  const band = el('rect', {x: 0, width: W, height: row, fill: '#f0efec', 'fill-opacity': 0.06, rx: 3, visibility: 'hidden'}, svg);
+  order.forEach((a, k) => {
+    const yy = m.t + row * k + row / 2, s = stats[a];
+    el('text', {x: m.l - 10, y: yy + 4, 'text-anchor': 'end', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = AXES[a];
+    if (s) { el('rect', {x: x(s[0]), y: yy - 6, width: Math.max(x(s[2]) - x(s[0]), 2), height: 12, fill: ACCENT, rx: 3}, svg);
+      el('circle', {cx: x(s[1]), cy: yy, r: 4.5, fill: '#f0efec', stroke: '#1a1a19', 'stroke-width': 1.5}, svg);
+      el('text', {x: x(s[2]) + 8, y: yy + 4, fill: '#8a897f', 'font-size': 11}, svg).textContent = total ? Math.round(s[1] / total * 100) + '%' : ''; }
+    el('line', {x1: x(libMed[a]), x2: x(libMed[a]), y1: yy - 9, y2: yy + 9, stroke: '#f0efec', 'stroke-width': 2}, svg);
+  });
+  // one hover layer on top of every mark, picking the row from the mouse height
+  const hit = el('rect', {x: 0, y: m.t, width: W, height: row * AXES.length, fill: 'transparent'}, svg);
+  hit.addEventListener('mousemove', e => {
+    const box = svg.getBoundingClientRect(), py = (e.clientY - box.top) * H / box.height;
+    const k = Math.min(Math.max(Math.floor((py - m.t) / row), 0), AXES.length - 1), a = order[k], s = stats[a];
+    band.setAttribute('y', m.t + row * k); band.setAttribute('visibility', 'visible');
+    showTip(e, `<b>${AXES[a]}</b><br>` + (s ? `filtered: median ${s[1].toFixed(3)}, middle half ${s[0].toFixed(3)} to ${s[2].toFixed(3)}<br>` : '') + `library median ${libMed[a].toFixed(3)}`);
+  });
+  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); });
+  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "share of each chart's total (a chart's axes add up to how hard the model rates it)";
+}
+
+// table
+// [label, sort key, cell class, hover text]; drumchotic's call and the human one side by side
+const placedTiers = c => [...new Set(c.tn.map(([, t]) => t))].sort((a, b) => a - b);
+const COLS = [
+  ['#', null, 'n', ''],
+  ['tier', c => c.lv, 'n','drumchotic: estimated DMT tier, 1 to 8 (past 8 keeps counting, 0 = below tier 1)'],
+  ['diff', c => c.ch, 'n di', 'drumchotic: suggested song.ini diff, 0 to 6 (past 6 keeps counting)'],
+  ['tier', c => placedTiers(c)[0] ?? -1, 'n sep','human: where a DMT tournament placed it (hover a cell for which)'],
+  ['diff', c => c.r ?? -1, 'n di', "human: what the chart's song.ini says"],
+  ['plays', c => c.n, 'n sep', 'scores on the leaderboard'],
+  ['chart', c => c.low, 't', ''],
+  ['hard for', null, 'w', 'axes where this chart beats 85% of charts at its tier'],
+];
+const CHART_COL = 6;
+let sortCol = 1, sortDir = -1;
+function sample(sel) {
+  // sort by tier, cut into exactly that many equal-size groups and keep each group's most played
+  // chart, so the ladder can be spot-checked with familiar songs
+  const want = SAMPLE_SIZES[+$('samples').value];
+  if (!want || sel.length <= want) return {rows: sel, every: 0};
+  const byTier = [...sel].sort((a, b) => a.lv - b.lv), rows = [];
+  for (let g = 0; g < want; g++) {
+    const chunk = byTier.slice(Math.floor(g * byTier.length / want), Math.floor((g + 1) * byTier.length / want));
+    rows.push(chunk.reduce((p, q) => q.n > p.n ? q : p));
+  }
+  return {rows, every: sel.length / want};
+}
+const moreRows = new IntersectionObserver(seen => {
+  if (seen.some(e => e.isIntersecting)) { rowsShown += ROWS; drawTable(current, true); }
+}, {rootMargin: '800px'});
+function drawTable(all, more = false) {
+  if (!more) rowsShown = ROWS;
+  const {rows: sel, every} = sample(all);
+  const key = COLS[sortCol][1], rows = key ? [...sel].sort((a, b) => { const p = key(a), q = key(b); return (p < q ? -1 : p > q ? 1 : 0) * sortDir; }) : sel;
+  const groups = '<tr class="groups"><th></th><th colspan="2">drumchotic</th><th colspan="2" class="sep">human</th><th colspan="3" class="sep"></th></tr>';
+  const head = groups + '<tr>' + COLS.map(([n, , cls, help], k) => `<th class="${cls.replace(/\b[tw]\b/, '')}" data-k="${k}" title="${help}">${n}${k === sortCol ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('') + '</tr>';
+  const body = rows.slice(0, rowsShown).map((c, k) => {
+    const placed = placedTiers(c);
+    return `<tr><td class="n">${k + 1}</td><td class="n" style="color:${levelColor(c.lv)}">${c.lv.toFixed(1)}</td>`
+      + `<td class="n di">${c.ch.toFixed(1)}</td>`
+      + `<td class="n sep" title="${esc(tierText(c))}" style="color:${placed.length ? levelColor(placed[0]) : 'inherit'}">${placed.length ? 'T' + placed.join('/') : ''}</td>`
+      + `<td class="n di">${c.r ?? ''}</td><td class="n sep">${c.n || ''}</td><td class="t">${esc(c.name)}</td>`
+      + `<td class="w">${c.why.map(i => AXES[i]).join(', ')}</td></tr>`; }).join('');
+  const left = rows.length - rowsShown;
+  $('table').innerHTML = head + body + (left > 0 ? `<tr id="more"><td colspan="8" class="more">loading ${left} more...</td></tr>` : '');
+  moreRows.disconnect();
+  if (left > 0) moreRows.observe($('more'));
+  $('table').querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = +th.dataset.k; if (!COLS[k][1]) return;
+    sortDir = k === sortCol ? -sortDir : (k === CHART_COL ? 1 : -1); sortCol = k; drawTable(current); });
+  $('tcount').textContent = 'click a column to sort, hover a header for what it means';
+  $('spotseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === +$('samples').value));
+  $('thinval').textContent = every
+    ? `${sel.length} of ${all.length}: the most played of every ${Math.round(every)} charts in tier order`
+    : all.length < ALL.length ? `showing all ${all.length} that match` : `showing all ${all.length}`;
+}
+function esc(s) { return s.replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
+
+let current = ALL;
+function update() {
+  try { localStorage.setItem('drumchotic-filters', JSON.stringify(Object.fromEntries(CONTROLS.map(k => [k, $(k).value])))); } catch (e) {}
+  current = filtered();
+  drawHist(current); drawScatter(current); drawAxes(current); drawTable(current);
+}
+addEventListener('resize', () => update());
+update();
+</script>
+</body>
+</html>
