@@ -19,6 +19,10 @@ What we measured, what we tried, and what it showed, so nothing has to be redisc
 - Every axis has a small negative correlation (-0.05 to -0.07) with the miss: the model slightly overrates charts that are hard on anything.
 - Chops charts (Matt McGuire, Luke Holland, Xane60 remixes) read easier than players find them: held-out mean 0.12 vs leaderboard 0.45. About a third of that gap is leaderboard bias (length and kick-heavy charts); tournament tiers show no hand-heavy vs kick-heavy bias. Pop punk (Rise Against) -0.57 vs -0.67, about right.
 
+## Is sticking worth it (2026-11-11)
+- Without the sticking axis: leaderboard 0.908 to 0.905, tiers 0.932 to 0.934 (inside noise). Without sticking and movement (both come from the hand assignment): leaderboard 0.900, about three times the noise. Alone: sticking 0.801, movement 0.682. Modest but real; keep it, and judge the sticking rework against these numbers.
+- Sticking is about 90% of measuring time (190 ms of 216 ms per chart); parsing is 7%, all other features under 5%. Hand assignments are cached per chart (data/cache/strokes), so rebuilds that don't touch sticking run about 20 times faster.
+
 ## Tried and dropped
 - One hand burst, stamina and syncopation axes: no measurable value (Spearman 0.908 to 0.907, tiers 0.936 to 0.935, both inside noise of about 0.003 and 0.011). Switched off in tuning.AXES_ON, still measured.
 - Coordination: the old version was mostly zero. Rebuilt as simultaneous syncopation across limbs (min of kick and hand rates of offbeat and new-rhythm notes); alone it predicts 0.75, but dropping it costs nothing.

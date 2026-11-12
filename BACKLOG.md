@@ -3,13 +3,11 @@
 Plans, community feedback and tuning ideas. Source in brackets; the raw threads are in data/feedback/ (gitignored), findings in docs/findings.md.
 
 ## Next up, in order
-1. Run the heavy steps on bazzite (feature build, fit, audit, reports, page) from one script; the Mac only pulls results.
-2. Incremental feature cache: store features per chart and per feature group, keyed by the code that made them, so new charts or a new feature don't re-measure everything; tune on the ~7,500 training charts and measure the full library only before publishing.
-3. Flag charts beyond human limits.
-4. Length: the strongest miss left. The model rates long charts harder than the leaderboard (rank corr -0.23); goes with album charts and short-burst-vs-whole-song below.
-5. Familiarity feature.
-6. Sticking rework.
-7. FC readout and hand endurance.
+1. Flag charts beyond human limits.
+2. Length: the strongest miss left. The model rates long charts harder than the leaderboard (rank corr -0.23); goes with album charts and short-burst-vs-whole-song below.
+3. Familiarity feature.
+4. Sticking rework (sticking plus movement are worth about 0.008 Spearman today; see docs/findings.md).
+5. FC readout and hand endurance.
 
 ## Product
 - [ ] State what the rating is, on the site and in the README, for users as well as us: misses on expert 2x kick (accuracy, not score or star power, passing doesn't count); 0 means easier than a typical tier 1 tournament song; the top end is anchored by absurd charts (quadruple kick, Venetian Snares); the goal is an average difficulty that doesn't over-reward any one skill, the way tournament tiers try to. [Half-Gallon: "they just need to be stated and understood on your side AND the user side"]
@@ -19,8 +17,10 @@ Plans, community feedback and tuning ideas. Source in brackets; the raw threads 
 - [ ] Let people test upcoming tournament setlists (works today with scripts/rate.sh on the setlist folder; armchair and Pile are using the site for the next setlist). [armchair]
 
 ## Infrastructure
-- [ ] bazzite runs the heavy work: repo at ~/drumchotic (git remote `bazzite`), venv, data/charts as a local copy (virtiofs to the NAS is too slow to walk). Needs a script that pushes code, runs a step, and pulls back results, plus keeping its chart copy in sync from the NAS plocate list.
-- [ ] Incremental feature cache (see Next up).
+- [x] bazzite runs the heavy work: scripts/remote.sh sends the working tree (uncommitted edits included) and runs features, report, audit, web, rate or test there, pulling results back. Repo at ~/drumchotic (git remote `bazzite`), own venv, data/charts as a local copy (virtiofs to the NAS is too slow to walk).
+- [x] Cache each chart's hand assignment (sticking is 90% of measuring time): rebuilds that don't touch sticking or parsing run about 20 times faster. Per-feature-group caching isn't worth it (all other features are under 5% of the time).
+- [ ] Keep bazzite's chart copy in sync with the NAS (bazzite can't reach nasmox by name; relay through the Mac from the plocate list), then point publish_web.sh and serve.sh at remote builds.
+- [ ] Give bazzite all 16 host threads in Proxmox (it has 8): a cold full build is about 17 min today. [needs Noah]
 - [ ] Delete the Mac's data/charts (2.9 GB) once bazzite does all measuring.
 - [ ] From the rebuild agent: modules run outside the repo root silently find no data (pipeline.DATA is cwd-relative); check page and explorer peer windows differ by one (601 vs 600); the live-reload server doesn't watch data/dmt, leaderboards or results.
 
