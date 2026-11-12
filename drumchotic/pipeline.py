@@ -12,7 +12,7 @@ from .chart import song
 from .fit import players
 from .fit.axes import AxisModel
 from .sources import dmt, leaderboard, tournaments
-from .tuning import MIN_NOTES, MIN_SCORES
+from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
 DATA = Path('data')
 FOLDS = 5
@@ -52,6 +52,14 @@ class Results:
         """Leaderboard difficulty and held-out prediction for every pool chart, as two arrays."""
         return (np.array([self.fit.difficulty[m] for m in self.pool]),
                 np.array([self.held_out[m] for m in self.pool]))
+
+    def shares(self, ms):
+        """Each axis's slice of difficulty above the intercept, {axis: array}. With the power mean
+        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept."""
+        p = self.model.power
+        a = np.array([[self.axes[x][m] for m in ms] for x in AXES])
+        S = (a ** p).sum(0) ** (1 / p)
+        return dict(zip(AXES, a ** p / np.where(S > 0, S, 1) ** (p - 1)))
 
 
 def fold_of(pool):
