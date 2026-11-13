@@ -19,9 +19,9 @@ Plans, community feedback and tuning ideas. Source in brackets; the raw threads 
 - [x] bazzite runs the heavy work: scripts/remote.sh sends the working tree (uncommitted edits included) and runs features, report, audit, web, rate or test there, pulling results back. Repo at ~/drumchotic (git remote `bazzite`), own venv, data/charts as a local copy (virtiofs to the NAS is too slow to walk).
 - [x] Cache each chart's hand assignment (sticking is 90% of measuring time): rebuilds that don't touch sticking or parsing run about 20 times faster. Per-feature-group caching isn't worth it (all other features are under 5% of the time).
 - [ ] Keep bazzite's chart copy in sync with the NAS (bazzite can't reach nasmox by name; relay through the Mac from the plocate list), then point publish_web.sh and serve.sh at remote builds.
-- [ ] Give bazzite all 16 host threads in Proxmox (it has 8): a cold full build is about 17 min today. [needs Noah]
+- [ ] Give bazzite all 16 host threads in Proxmox (it has 8): a cold full build is about 17 min today. [manual, Proxmox UI]
 - [ ] Delete the Mac's data/charts (2.9 GB) once bazzite does all measuring.
-- [ ] From the rebuild agent: modules run outside the repo root silently find no data (pipeline.DATA is cwd-relative); check page and explorer peer windows differ by one (601 vs 600); the live-reload server doesn't watch data/dmt, leaderboards or results.
+- [ ] Found in the rebuild: modules run outside the repo root silently find no data (pipeline.DATA is cwd-relative); diagnostics page and explorer peer windows differ by one (601 vs 600); the live-reload server doesn't watch data/dmt, leaderboards or results.
 
 ## Data
 - [x] Copy every unique chart on the NAS from the plocate index (31,898 local), including the Rock Band discs and RB1/RB2 DLC.

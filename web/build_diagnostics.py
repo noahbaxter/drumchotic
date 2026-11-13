@@ -1,8 +1,8 @@
-"""A local HTML page for checking the model by eye: model vs players for every scored chart,
+"""Model diagnostics page, for checking the model by eye: model vs players for every scored chart,
 each chart's axis profile against the library and against charts of similar difficulty, and
-the worst disagreements. Written next to the plots on every render.
+the worst disagreements. scripts/run.sh writes it next to the plots on every render.
 
-python -m drumchotic.page            writes data/plots/<latest>/check.html
+python -m web.build_diagnostics      writes data/plots/<latest>/diagnostics.html
 """
 import json
 import sys
@@ -10,11 +10,11 @@ import sys
 import numpy as np
 from scipy.stats import spearmanr
 
-from . import pipeline
-from .fit.metrics import tier_accuracy
-from .plots import PLOTS_DIR, latest_render
-from .rating import PEERS
-from .tuning import AXES, MIN_SCORES
+from drumchotic import pipeline
+from drumchotic.fit.metrics import tier_accuracy
+from drumchotic.rating import PEERS
+from drumchotic.tools.plots import PLOTS_DIR, latest_render
+from drumchotic.tuning import AXES, MIN_SCORES
 
 FEW_SCORES = 10
 LONG_S = 300
@@ -75,7 +75,7 @@ def write(r, path):
 def main(argv):
     out = latest_render() or PLOTS_DIR
     out.mkdir(parents=True, exist_ok=True)
-    print(f'page -> {write(pipeline.run(), out / "check.html")}')
+    print(f'diagnostics -> {write(pipeline.run(), out / "diagnostics.html")}')
 
 
 TEMPLATE = r'''<!doctype html>
@@ -83,7 +83,7 @@ TEMPLATE = r'''<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Drumchotic model check</title>
+<title>Drumchotic diagnostics</title>
 <style>
 /* layout: scatter and chart inspector side by side, outlier tables below */
 :root {
@@ -140,7 +140,7 @@ tr.sel { background: var(--bg); }
 </style>
 </head>
 <body>
-<h1>Drumchotic model check</h1>
+<h1>Drumchotic diagnostics</h1>
 <p class="sub" id="summary"></p>
 
 <div class="row">

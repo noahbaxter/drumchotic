@@ -1,4 +1,4 @@
-"""Fit everything from the feature caches once; rate, report, audit, plots and page read the result."""
+"""Fit everything from the feature caches once; the tools and web pages read the result."""
 import collections
 import functools
 import hashlib
@@ -15,7 +15,7 @@ from .chart import song
 from .fit import players
 from .fit.axes import AxisModel
 from .fit.metrics import tier_accuracy
-from .measure import familiarity
+from .measure import rarity
 from .sources import dmt, leaderboard, rockband, tournaments
 from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
@@ -25,22 +25,22 @@ BOOTSTRAPS = 200
 
 
 def load_features(*names):
-    """md5 -> {'folder', 'title', 'features'}, rarity features (build_familiarity) folded in."""
+    """md5 -> {'folder', 'title', 'features'}, rarity features (build_rarity) folded in."""
     out = {}
     for n in names:
         p = DATA / 'cache' / n
         if p.exists():
             out.update(json.loads(p.read_text()))
-    rarity = json.loads((DATA / 'cache/familiarity.json').read_text())
+    rare = json.loads((DATA / 'cache/rarity.json').read_text())
     for m, e in out.items():
-        e['features'].update(rarity[m])
+        e['features'].update(rare[m])
     return out
 
 
 @functools.cache
-def patterns():
+def rarity_table():
     """The library's run table, for scoring rarity on charts outside the library."""
-    return familiarity.Table.load(DATA / 'cache/patterns.npz')
+    return rarity.Table.load(DATA / 'cache/rarity_table.npz')
 
 
 @dataclass

@@ -3,6 +3,6 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-out=$(.venv/bin/python -m web.build)
+out=$(.venv/bin/python -m web.build_explorer)
 echo "$out"
 open "$out"

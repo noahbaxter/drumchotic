@@ -1,15 +1,15 @@
 """Per-axis scorecard: how well each axis predicts on its own, and what the model loses without it.
 Every variant is refit on the pipeline's own folds, so the numbers compare directly.
 
-python -m drumchotic.audit
+python -m drumchotic.tools.audit
 """
 from concurrent.futures import ProcessPoolExecutor
 
 from scipy.stats import spearmanr
 
-from . import pipeline
-from .fit.metrics import tier_accuracy
-from .tuning import AXES
+from .. import pipeline
+from ..fit.metrics import tier_accuracy
+from ..tuning import AXES
 
 
 def evaluate(r, configs):

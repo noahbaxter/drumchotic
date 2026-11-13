@@ -17,7 +17,7 @@ from drumchotic.tuning import AXES
 
 OUT = Path(__file__).resolve().parent.parent / 'data' / 'web' / 'index.html'
 DATA = OUT.with_name('data.json')
-TEMPLATE = Path(__file__).with_name('template.html')
+TEMPLATE = Path(__file__).with_name('explorer.html')
 # song.ini fields the search box matches (not shown on the page); 'frets' is the old name for charter
 SEARCHED = ('artist', 'name', 'album', 'charter', 'frets', 'genre', 'year', 'playlist', 'sub_playlist')
 TAG = re.compile(r'<[^>]*>')   # Clone Hero colour/format tags in charter names

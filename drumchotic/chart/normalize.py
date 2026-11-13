@@ -76,7 +76,7 @@ def _disco_flip(pad, cymbal):
     return pad, cymbal
 
 
-def build_hits(raw, ttype, tempo, disco=()):
+def to_pro_drums(raw, ttype, tempo, disco=()):
     by_tick = {}
     for note in raw:
         by_tick.setdefault(note.tick, []).append(note)

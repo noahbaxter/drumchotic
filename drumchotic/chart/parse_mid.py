@@ -1,6 +1,6 @@
 from . import smf
 from .model import DrumChart, Dynamic, Span
-from .normalize import RawNote, build_hits, disco_ranges, in_ranges, track_type
+from .normalize import RawNote, disco_ranges, in_ranges, to_pro_drums, track_type
 from .tempo import TempoMap
 
 DRUM_TRACK_NAMES = ('PART DRUMS', 'PART DRUM')
@@ -73,7 +73,7 @@ def load(path, ini=None):
         track_type=ttype,
         pro_marked=pro_marked,
         resolution=resolution,
-        hits=build_hits(raw, ttype, tempo, disco_ranges(drums.texts) if pro_marked else ()),
+        hits=to_pro_drums(raw, ttype, tempo, disco_ranges(drums.texts) if pro_marked else ()),
         rolls=sorted(rolls, key=lambda s: s.start_ms),
         tempos=tempo.bpms(),
         time_sigs=conductor.time_sigs,

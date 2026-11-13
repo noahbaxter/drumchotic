@@ -70,14 +70,14 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import spearmanr
 
-from . import pipeline
-from .chart import song
-from .measure import familiarity, features
-from .rating import REASONS_SHOWN, Rater, charter_rating, library_title, reasons
+from .. import pipeline
+from ..chart import song
+from ..measure import features, rarity
+from ..rating import REASONS_SHOWN, Rater, charter_rating, library_title, reasons
 
 TITLE_WIDTH = 48       # longer titles are cut
 PACKED = ('.sng', '.zip', '.rar', '.7z')    # chart downloads this can't open yet
-REPORTS = Path(__file__).resolve().parent.parent / 'data' / 'ratings'
+REPORTS = Path(__file__).resolve().parents[2] / 'data' / 'ratings'
 
 
 def chart_folders(root):
@@ -211,7 +211,7 @@ def new_chart_features(chart):
     if not chart:
         return None
     f = features.compute(chart)
-    return {**f, **familiarity.features(*familiarity.runs(chart), pipeline.patterns(), in_table=False)}
+    return {**f, **rarity.features(*rarity.runs(chart), pipeline.rarity_table(), in_table=False)}
 
 
 def by_folder(rater, root, limit, detail):

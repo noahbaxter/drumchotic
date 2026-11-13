@@ -1,6 +1,6 @@
 """Serve the explorer locally and reload the browser on changes.
 
-template.html edits show on the next reload straight away. Edits to build.py, the drumchotic
+explorer.html edits show on the next reload straight away. Edits to build_explorer.py, the drumchotic
 package or the feature caches rebuild the data first (about a minute), then reload.
 
 python -m web.serve [port]
@@ -13,7 +13,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import build
+from . import build_explorer as explorer
 
 ROOT = Path(__file__).resolve().parent.parent
 POLL_S = 1.0
@@ -29,7 +29,7 @@ background:#2a2a28;color:#c3c2b7;font:12px system-ui;display:none">rebuilding da
 
 
 def data_inputs():
-    return [build.__file__, *ROOT.glob('drumchotic/**/*.py'), *ROOT.glob('data/cache/features*.json')]
+    return [explorer.__file__, *ROOT.glob('drumchotic/**/*.py'), *ROOT.glob('data/cache/features*.json')]
 
 
 def stamp(paths):
@@ -50,7 +50,7 @@ def rebuild_when_inputs_change():
         seen = now
         State.building = True
         print('inputs changed, rebuilding data...', flush=True)
-        done = subprocess.run([sys.executable, '-m', 'web.build'], cwd=ROOT, capture_output=True, text=True)
+        done = subprocess.run([sys.executable, '-m', 'web.build_explorer'], cwd=ROOT, capture_output=True, text=True)
         print(done.stderr[-2000:] if done.returncode else 'rebuilt', flush=True)
         State.building = False
 
@@ -58,10 +58,10 @@ def rebuild_when_inputs_change():
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/__version':
-            v = f'{stamp([build.TEMPLATE])}-{stamp([build.DATA])}'
+            v = f'{stamp([explorer.TEMPLATE])}-{stamp([explorer.DATA])}'
             self.send(json.dumps({'v': v, 'building': State.building}), 'application/json')
         elif self.path.split('?')[0] in ('/', '/index.html'):
-            self.send(build.page().replace('</body>', RELOAD, 1), 'text/html')
+            self.send(explorer.page().replace('</body>', RELOAD, 1), 'text/html')
         else:
             self.send_error(404)
 
@@ -80,9 +80,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv):
     port = int(argv[0]) if argv else 8781
-    if not build.DATA.exists():
+    if not explorer.DATA.exists():
         print('no data yet, building (about a minute)...', flush=True)
-        build.build()
+        explorer.build()
     threading.Thread(target=rebuild_when_inputs_change, daemon=True).start()
     print(f'http://localhost:{port}/  (ctrl-c to stop)', flush=True)
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

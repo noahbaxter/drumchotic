@@ -82,11 +82,11 @@ ROLL_MODE = 'half'
 # '1x' drops them, as if played on Expert with one pedal.
 KICK_MODE = '2x'
 # Rare patterns: how many other artists' charts play the same run of this many onsets (a chord is
-# one onset; gaps on a grid of FAMILIARITY_GRID per beat, so 16ths and triplets both land on it).
+# one onset; gaps on a grid of RARITY_GRID per beat, so 16ths and triplets both land on it).
 # Runs of 6 beat 3, 10, 15 and beat-length patterns: held-out leaderboard 0.912 -> 0.919, tiers
 # 0.932 -> 0.939, community 100%. Odd tuplets and odd meters added nothing on top.
-FAMILIARITY_RUN = 6
-FAMILIARITY_GRID = 12
+RARITY_RUN = 6
+RARITY_GRID = 12
 
 # ---- COMBINE: how axis scores become one difficulty (drumchotic/fit/axes.py)
 # How axes add up. 1 = plain sum (being decent at everything adds up).
@@ -133,7 +133,7 @@ AXES.update({
     'coordination': [f'coord_{k}_w{w}' for k in ('offbeat', 'novel') for w in WINDOWS_S],
     # new pad patterns, new limb orders, and new limb orders played one limb at a time
     'variety': [f'{k}_w{w}' for k in ('novel', 'limb_novel', 'limb_novel_single') for w in WINDOWS_S],
-    # runs of notes few other artists' charts play, scored against the library (build_familiarity.py)
+    # runs of notes few other artists' charts play, scored against the library (build_rarity.py)
     'rare patterns': ['rarity_mean', 'rarity_w4', 'rarity_w16'],
 })
 # Which axes are on. False leaves it out of the model, the reasons and every report; everything

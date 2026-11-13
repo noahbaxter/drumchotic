@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 from .model import DrumChart, Dynamic, Span
-from .normalize import RawNote, build_hits, disco_ranges, track_type
+from .normalize import RawNote, disco_ranges, to_pro_drums, track_type
 from .tempo import TempoMap
 
 DEFAULT_RESOLUTION = 192
@@ -99,7 +99,7 @@ def load(path, ini=None):
         track_type=ttype,
         pro_marked=pro_marked,
         resolution=resolution,
-        hits=build_hits(raw, ttype, tempo, disco_ranges(mix) if pro_marked else ()),
+        hits=to_pro_drums(raw, ttype, tempo, disco_ranges(mix) if pro_marked else ()),
         rolls=[Span(tempo.ms(a), tempo.ms(b), k) for a, b, k in sorted(rolls)],
         tempos=tempo.bpms(),
         time_sigs=time_sigs,

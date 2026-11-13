@@ -4,7 +4,8 @@ python -m drumchotic [plot names ...]
 """
 import sys
 
-from . import pipeline, plots, report
+from . import pipeline
+from .tools import plots, report
 
 if __name__ == '__main__':
     r = pipeline.run()

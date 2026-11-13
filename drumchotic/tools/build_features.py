@@ -1,6 +1,6 @@
 """Compute features for every chart folder under a root, keyed by chart md5.
 
-python -m drumchotic.build_features data/charts data/cache/features.json [--force]
+python -m drumchotic.tools.build_features data/charts data/cache/features.json [--force]
 
 Skips the work when the charts, the measuring code and the FEATURES/STICKING
 knobs are all unchanged since the last build.
@@ -11,11 +11,11 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from . import tuning
-from .chart import song
-from .measure import features
+from .. import tuning
+from ..chart import song
+from ..measure import features
 
-PACKAGE = Path(__file__).parent
+PACKAGE = Path(__file__).parent.parent
 
 
 def build_key(folders):

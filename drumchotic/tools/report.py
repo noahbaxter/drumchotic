@@ -1,16 +1,16 @@
 """Fit everything from the caches and print how it stacks up. Rerun after tuning.
 
-python -m drumchotic.report [--outliers N]
+python -m drumchotic.tools.report [--outliers N]
 """
 import sys
 
 import numpy as np
 from scipy.stats import spearmanr
 
-from . import pipeline
-from .fit.metrics import community_accuracy, tier_accuracy
-from .sources import community
-from .tuning import AXES
+from .. import pipeline
+from ..fit.metrics import community_accuracy, tier_accuracy
+from ..sources import community
+from ..tuning import AXES
 
 
 def main(argv):

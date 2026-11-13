@@ -1,6 +1,6 @@
 #!/bin/bash
 # Refresh feature caches if anything they depend on changed, then fit once,
-# print the report and render the plots.
+# print the report and render the plots, with the diagnostics page beside them.
 #   scripts/run.sh                  everything
 #   scripts/run.sh tiers hardest    only those plots
 set -euo pipefail
@@ -10,9 +10,10 @@ PY=.venv/bin/python
 
 for set in charts:features dmt:features_dmt anchors:features_anchors; do
     if [[ -d "data/${set%%:*}" ]]; then
-        $PY -m drumchotic.build_features "data/${set%%:*}" "data/cache/${set##*:}.json"
+        $PY -m drumchotic.tools.build_features "data/${set%%:*}" "data/cache/${set##*:}.json"
     fi
 done
-$PY -m drumchotic.build_familiarity
+$PY -m drumchotic.tools.build_rarity
 
 $PY -m drumchotic "$@"
+$PY -m web.build_diagnostics

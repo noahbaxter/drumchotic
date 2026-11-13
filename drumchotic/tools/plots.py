@@ -1,8 +1,7 @@
-"""Every plot worth looking at after a tuning pass, dark mode, into data/plots/<timestamp>/,
-plus check.html (drumchotic/page.py) for clicking through the model chart by chart.
+"""Every plot worth looking at after a tuning pass, dark mode, into data/plots/<timestamp>/.
 A run whose plots match the latest folder byte for byte just relabels that folder.
 
-python -m drumchotic.plots [name ...]      no names: every plot
+python -m drumchotic.tools.plots [name ...]      no names: every plot
 """
 import collections
 import datetime
@@ -18,10 +17,11 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.stats import rankdata, spearmanr
 
-from . import pipeline, report
-from .fit.metrics import tier_accuracy
-from .sources import fretwork
-from .tuning import AXES
+from . import report
+from .. import pipeline
+from ..fit.metrics import tier_accuracy
+from ..sources import fretwork
+from ..tuning import AXES
 
 SURFACE, INK, INK_2, GRID = '#1a1a19', '#f0efec', '#c3c2b7', '#2c2c2a'
 OURS, OTHER = '#3987e5', '#d95926'          # validated dark categorical slots 1 and 2
@@ -335,8 +335,6 @@ def render(r, names=()):
         fig.tight_layout()
         fig.savefig(out / f'{name}.png', dpi=130)
         plt.close(fig)
-    from . import page          # page builds on this module's helpers
-    page.write(r, out / 'check.html')
     if previous and same_plots(out, previous):
         shutil.rmtree(out)
         previous.rename(out)
@@ -346,8 +344,9 @@ def render(r, names=()):
 
 
 def same_plots(a, b):
-    files = sorted(p.name for p in a.iterdir())
-    return files == sorted(p.name for p in b.iterdir()) and all(
+    """Plots only: diagnostics.html lands in the folder afterwards (web/build_diagnostics.py)."""
+    files = sorted(p.name for p in a.glob('*.png'))
+    return files == sorted(p.name for p in b.glob('*.png')) and all(
         (a / f).read_bytes() == (b / f).read_bytes() for f in files)
 
 

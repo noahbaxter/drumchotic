@@ -9,4 +9,4 @@ set -euo pipefail
 # folder and --out paths are relative to where this was run from
 export RATE_CWD="$PWD"
 cd "$(dirname "$0")/.."
-exec .venv/bin/python -m drumchotic.rate "$@"
+exec .venv/bin/python -m drumchotic.tools.rate "$@"

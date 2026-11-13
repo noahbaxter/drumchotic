@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-.venv/bin/python -m web.build >/dev/null
+.venv/bin/python -m web.build_explorer >/dev/null
 pages=.worktrees/gh-pages
 if [ ! -d "$pages" ]; then
   if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then

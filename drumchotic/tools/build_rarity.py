@@ -1,9 +1,9 @@
 """Score how rare each chart's note patterns are against the whole library.
 
-python -m drumchotic.build_familiarity
+python -m drumchotic.tools.build_rarity
 
 Runs after build_features: it takes the chart folders from the feature caches and writes
-data/cache/familiarity.json (md5 -> rarity features) and data/cache/patterns.npz (how many artists
+data/cache/rarity.json (md5 -> rarity features) and data/cache/rarity_table.npz (how many artists
 play each run, for rating charts outside the library). Leaderboard and tournament charts make up
 the table; anchors are scored against it without counting toward it. Skips the work when no
 feature cache changed.
@@ -13,20 +13,20 @@ import json
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from .chart import song
-from .measure import familiarity
+from ..chart import song
+from ..measure import rarity
 
 CACHE = Path('data/cache')
 TABLE_SETS = ('features', 'features_dmt')
 SETS = (*TABLE_SETS, 'features_anchors')
-OUT, TABLE, KEY = CACHE / 'familiarity.json', CACHE / 'patterns.npz', CACHE / 'familiarity.key'
+OUT, TABLE, KEY = CACHE / 'rarity.json', CACHE / 'rarity_table.npz', CACHE / 'rarity.key'
 
 
 def one(job):
     md5, folder = job
     try:
         chart, meta = song.load(folder)
-        return md5, familiarity.artist(meta), *familiarity.runs(chart)
+        return md5, rarity.artist(meta), *rarity.runs(chart)
     except Exception:
         return md5, None, None, None
 
@@ -49,9 +49,9 @@ def main():
     for m, a, _, h in runs:
         if m in in_table:
             by_artist[a].append(h)
-    table = familiarity.Table.build(by_artist)
-    out = {m: dict(familiarity.EMPTY) for m in folders}
-    out.update({m: familiarity.features(t, h, table, m in in_table) for m, _, t, h in runs})
+    table = rarity.Table.build(by_artist)
+    out = {m: dict(rarity.EMPTY) for m in folders}
+    out.update({m: rarity.features(t, h, table, m in in_table) for m, _, t, h in runs})
     OUT.write_text(json.dumps(out))
     table.save(TABLE)
     KEY.write_text(key)
