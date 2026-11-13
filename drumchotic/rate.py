@@ -41,6 +41,8 @@ THE AXES
   linear                            limbs alternating with no two at once
   coordination                      kicks and hands syncopated at the same time
   variety                           how rarely patterns repeat (chops vs groove)
+  rare patterns                     runs of notes few other artists' charts play: less muscle
+                                    memory to lean on
 
 OUTPUT
   The report is printed and also saved as plain text to data/ratings/<date>_<names>.txt
@@ -68,8 +70,9 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import spearmanr
 
+from . import pipeline
 from .chart import song
-from .measure import features
+from .measure import familiarity, features
 from .rating import REASONS_SHOWN, Rater, charter_rating, library_title, reasons
 
 TITLE_WIDTH = 48       # longer titles are cut
@@ -101,6 +104,8 @@ def chart_rows(rater, rated, limit, detail):
                      f"  {fit(title, width):{width}}  {why}".rstrip())
         if detail:
             lines += [f"{'':40}{a:22} library {lib:3.0f}%   at its tier {peer:3.0f}%" for a, lib, peer in res['axes']]
+            if round(res['length_tiers'], 1):
+                lines.append(f"{'':40}{'length':22} {res['length_tiers']:+.1f} tiers (long charts rate easier)")
     if limit and len(rated) > limit:
         lines.append(f'       ... {len(rated) - limit} easier charts not shown')
     return lines
@@ -202,6 +207,13 @@ def by_tournament(rater, names, limit, detail):
     return out
 
 
+def new_chart_features(chart):
+    if not chart:
+        return None
+    f = features.compute(chart)
+    return {**f, **familiarity.features(*familiarity.runs(chart), pipeline.patterns(), in_table=False)}
+
+
 def by_folder(rater, root, limit, detail):
     rated, notes, online_only = [], [], 0
     for folder in chart_folders(root):
@@ -210,7 +222,8 @@ def by_folder(rater, root, limit, detail):
             continue
         try:
             chart, meta = song.load(folder)
-            feats = features.compute(chart) if chart else None
+            # a library chart rates the same as in the library: its own artist is already out of its rarity
+            feats = rater.r.features.get(song.md5(folder)) or new_chart_features(chart)
         except Exception as e:
             notes.append(f'skipped {folder.name}: {type(e).__name__}: {e}')
             continue

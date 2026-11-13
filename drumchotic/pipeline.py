@@ -1,5 +1,6 @@
 """Fit everything from the feature caches once; rate, report, audit, plots and page read the result."""
 import collections
+import functools
 import hashlib
 import json
 import pickle
@@ -14,7 +15,8 @@ from .chart import song
 from .fit import players
 from .fit.axes import AxisModel
 from .fit.metrics import tier_accuracy
-from .sources import dmt, leaderboard, tournaments
+from .measure import familiarity
+from .sources import dmt, leaderboard, rockband, tournaments
 from .tuning import AXES, MIN_NOTES, MIN_SCORES
 
 DATA = Path('data')
@@ -23,12 +25,22 @@ BOOTSTRAPS = 200
 
 
 def load_features(*names):
+    """md5 -> {'folder', 'title', 'features'}, rarity features (build_familiarity) folded in."""
     out = {}
     for n in names:
         p = DATA / 'cache' / n
         if p.exists():
             out.update(json.loads(p.read_text()))
+    rarity = json.loads((DATA / 'cache/familiarity.json').read_text())
+    for m, e in out.items():
+        e['features'].update(rarity[m])
     return out
+
+
+@functools.cache
+def patterns():
+    """The library's run table, for scoring rarity on charts outside the library."""
+    return familiarity.Table.load(DATA / 'cache/patterns.npz')
 
 
 @dataclass
@@ -39,6 +51,7 @@ class Results:
     songs: dict          # md5 -> leaderboard.Song
     fit: players.Fit     # leaderboard difficulty and player skill
     labels: list         # [(dmt.Label, md5)]
+    rock_band: list      # [rockband.Label]: official Rock Band drum tiers
     pool: list           # md5s used as training targets
     held_out: dict       # md5 -> prediction from a model that never saw that chart (pool only)
     tier_pred: dict      # md5 -> prediction from a model trained without any DMT chart
@@ -59,7 +72,8 @@ class Results:
 
     def shares(self, ms):
         """Each axis's slice of difficulty above the intercept, {axis: array}. With the power mean
-        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept."""
+        S = (sum a^p)^(1/p), a^p / S^(p-1) sums to S exactly, so the slices add up to pred - intercept,
+        less the length discount on long charts."""
         p = self.model.power
         a = np.array([[self.axes[x][m] for m in ms] for x in AXES])
         S = (a ** p).sum(0) ** (1 / p)
@@ -149,4 +163,4 @@ def run():
     allm = list(F)
     pred = dict(zip(allm, model.predict([F[m] for m in allm])))
     axes = {a: dict(zip(allm, v)) for a, v in model.axis_scores([F[m] for m in allm]).items()}
-    return Results(library, anchors, F, songs, fit, labels, pool, held_out, tier_pred, model, pred, axes)
+    return Results(library, anchors, F, songs, fit, labels, rockband.load(library), pool, held_out, tier_pred, model, pred, axes)

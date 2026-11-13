@@ -215,7 +215,7 @@ def plot_axes(r):
         ax.plot([p25, p75], [yi, yi], color=OURS, lw=9, solid_capstyle='butt')
         ax.scatter([p50], [yi], s=40, color=INK, zorder=3, linewidths=0)
         ax.text(p95, yi, f'   {sh[a].sum() / total:.0%}', va='center', fontsize=9, color=INK_2)
-    ax.set(yticks=y, yticklabels=axes, xlabel=f'share of difficulty (all axes sum to difficulty {-r.model.intercept:+.2f})',
+    ax.set(yticks=y, yticklabels=axes, xlabel=f'share of difficulty (all axes sum to difficulty {-r.model.intercept:+.2f}, before the length discount)',
            title='What drives difficulty, per axis  ·  % = share of the library total')
     ax.set_xlim(left=0)
     ax.grid(axis='x')

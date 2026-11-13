@@ -81,6 +81,12 @@ ROLL_MODE = 'half'
 # 2x kick notes are opt-in (Expert+). '2x' counts them, as if played on a double pedal;
 # '1x' drops them, as if played on Expert with one pedal.
 KICK_MODE = '2x'
+# Rare patterns: how many other artists' charts play the same run of this many onsets (a chord is
+# one onset; gaps on a grid of FAMILIARITY_GRID per beat, so 16ths and triplets both land on it).
+# Runs of 6 beat 3, 10, 15 and beat-length patterns: held-out leaderboard 0.912 -> 0.919, tiers
+# 0.932 -> 0.939, community 100%. Odd tuplets and odd meters added nothing on top.
+FAMILIARITY_RUN = 6
+FAMILIARITY_GRID = 12
 
 # ---- COMBINE: how axis scores become one difficulty (drumchotic/fit/axes.py)
 # How axes add up. 1 = plain sum (being decent at everything adds up).
@@ -92,6 +98,17 @@ AXIS_POWER = 2.0
 # matter more than the scores say, 0 to switch it off. Applied before AXIS_POWER.
 # Axes not listed stay at 1, e.g. {'kick stamina': 1.5}.
 AXIS_SCALE = {}
+# Long charts rate easier than their axes say: a miss costs a smaller share of percent on a long
+# song. One slope on log seconds past the training charts' median length, fit after the axes and
+# never positive, so only charts longer than typical move. Held-out: leaderboard 0.908 -> 0.912,
+# tiers flat, community 96% -> 100%.
+LENGTH_DISCOUNT = True
+# 5-lane tracks (all Neversoft Guitar Hero ports in the pool) play about 0.4 harder than their notes
+# say: 51 songs charted both ways have the same onsets and model rating, but the GH version scores
+# 0.47 harder. Not in the notes (tempo maps, off-grid notes, pad mapping all ruled out), so likely how
+# Clone Hero plays 5-lane. One step fit after length. Held-out: leaderboard 0.923 -> 0.926, tiers
+# 0.938 -> 0.934 (Icebreaker 2022's 27 GH World Tour charts, tiered by their notes), community 100%.
+FIVE_LANE_STEP = True
 # Which features feed each axis.
 AXES = {
     'speed': ['max_nps'],
@@ -116,6 +133,8 @@ AXES.update({
     'coordination': [f'coord_{k}_w{w}' for k in ('offbeat', 'novel') for w in WINDOWS_S],
     # new pad patterns, new limb orders, and new limb orders played one limb at a time
     'variety': [f'{k}_w{w}' for k in ('novel', 'limb_novel', 'limb_novel_single') for w in WINDOWS_S],
+    # runs of notes few other artists' charts play, scored against the library (build_familiarity.py)
+    'rare patterns': ['rarity_mean', 'rarity_w4', 'rarity_w16'],
 })
 # Which axes are on. False leaves it out of the model, the reasons and every report; everything
 # refits on the next run. One hand is off because it adds nothing measurable: without it
@@ -138,6 +157,7 @@ AXES_ON = {
     'linear':               True,
     'coordination':         True,
     'variety':              True,
+    'rare patterns':        True,
 }
 assert set(AXES_ON) == set(AXES), f'AXES_ON must list every axis: {sorted(set(AXES) ^ set(AXES_ON))}'
 AXES = {a: ks for a, ks in AXES.items() if AXES_ON[a]}

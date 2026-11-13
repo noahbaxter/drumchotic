@@ -27,8 +27,8 @@ def groove(start_tick, bars):
 
 
 def blast(start_tick, bars):
-    """Snare and kick on every 16th."""
-    return [hit(start_tick + i * SIXTEENTH, p) for i in range(bars * 16) for p in (Pad.RED, Pad.KICK)]
+    """Snare and kick on every 32nd (16 moments/s at 120 BPM)."""
+    return [hit(start_tick + i * SIXTEENTH // 2, p) for i in range(bars * 32) for p in (Pad.RED, Pad.KICK)]
 
 
 class DensityTests(unittest.TestCase):
