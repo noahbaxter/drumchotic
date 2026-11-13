@@ -21,6 +21,18 @@ TEMPLATE = Path(__file__).with_name('template.html')
 # song.ini fields the search box matches (not shown on the page); 'frets' is the old name for charter
 SEARCHED = ('artist', 'name', 'album', 'charter', 'frets', 'genre', 'year', 'playlist', 'sub_playlist')
 TAG = re.compile(r'<[^>]*>')   # Clone Hero colour/format tags in charter names
+RESULTS = OUT.parent.parent / 'results'
+STARTED = re.compile(r'started (\w+ \d+, \d{4})')   # in the scraped Challonge standings headers
+
+
+def tournament_dates():
+    """{tournament folder name: first bracket's start date, YYYY-MM-DD} from data/results."""
+    dates = {}
+    for d in RESULTS.iterdir() if RESULTS.exists() else ():
+        found = [datetime.strptime(m.group(1), '%B %d, %Y') for f in d.glob('*.txt') if (m := STARTED.search(f.read_text()))]
+        if found:
+            dates[d.name] = f'{min(found):%Y-%m-%d}'
+    return dates
 
 
 def search_text(folder):
@@ -70,7 +82,7 @@ def build():
         })
     groups = sorted({g for v in tiers.values() for g, _ in v})
     medians = [[int(t), round(rater.charter(v), 3)] for t, v in zip(rater.level.levels, rater.level.medians)]
-    data = {'axes': axes, 'groups': groups, 'charts': charts, 'tierMedians': medians,
+    data = {'axes': axes, 'groups': groups, 'charts': charts, 'tierMedians': medians, 'started': tournament_dates(),
             'built': f'{datetime.now():%Y-%m-%d}'}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     DATA.write_text(json.dumps(data, separators=(',', ':')))

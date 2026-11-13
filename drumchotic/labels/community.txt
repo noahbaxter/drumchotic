@@ -1,0 +1,10 @@
+# Community difficulty claims: a third scorecard next to the leaderboard and tournament tiers.
+# A claim starts with "@ artist | who, where" and lists groups of song titles, hardest group first,
+# titles separated by ";". Every song in a group should rate harder than every song in later
+# groups. Titles match the library ignoring case and a trailing "(B)".
+
+@ Car Bomb | armchairsum65, Discord 2026-11-11
+The Seconds; Spirit of Poison; This Will Do The Job; Gum Under the Table; His Eyes; Recursive Patterns; M^6; Rid; Malpractice [Faith No More]
+Start/Fade Out; Mordial
+Infinite Sun; Naked Fuse
+Cenotaph

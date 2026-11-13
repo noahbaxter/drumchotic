@@ -66,6 +66,20 @@
   .seg button:hover { color: var(--ink); }
   .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .more { color: var(--ink-3); padding: 10px 8px; }
+  #tourn { overflow-x: auto; }
+  #tourn table { width: auto; }
+  #tourn th { position: static; cursor: default; text-align: center; min-width: 52px; }
+  #tourn th:first-child, #tourn td:first-child { text-align: left; min-width: 90px; }
+  #tourn td { text-align: center; font-weight: 600; }
+  #tourn td.empty { color: var(--grid); font-weight: 400; }
+  #tourn [data-c] { padding: 1px 4px; border-radius: 4px; outline: 1.5px solid transparent; cursor: default; }
+  #tourn [data-c]:hover { outline-color: var(--ink); }
+  /* white ring over the hovered dot on a chart */
+  .ring { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid var(--ink);
+          border-radius: 50%; pointer-events: none; display: none; }
+  .holder { position: relative; }
+  #tourn td sub { color: var(--ink-3); font-size: 10px; font-weight: 400; margin-left: 2px; vertical-align: baseline; }
+  #tourn svg { width: 100%; }
   @media (max-width: 600px) { main { grid-template-columns: 1fr; padding: 12px 16px; } .bar { padding: 10px 16px; } #q { width: 100%; } }
 </style>
 </head>
@@ -86,7 +100,10 @@
 </div>
 <main>
   <section class="panel"><h2><span class="seg" id="scale"><button data-v="d">diff</button><button data-v="lv">tier</button></span> <span>drumchotic's, filtered charts over the grey shape of the whole library</span></h2><svg id="hist"></svg></section>
-  <section class="panel"><h2>Model vs leaderboard <span id="sp"></span></h2><canvas id="scatter"></canvas></section>
+  <section class="panel"><h2>Model vs leaderboard <span id="sp"></span></h2><div class="holder"><canvas id="scatter"></canvas><div class="ring" id="sring"></div></div></section>
+  <section class="panel wide"><h2>Tournaments <span class="seg" id="tview"><button data-v="grid">grid</button><button data-v="dots">chart</button></span>
+    <span class="seg" id="tplace"><button data-v="given">given tier</button><button data-v="closest">closest tier</button></span>
+    <span>median drumchotic tier of each human tier; only 2024 on sets the tier scale</span></h2><div id="tourn"></div></section>
   <section class="panel wide"><h2>What makes charts hard <span>median and middle half of each axis's share, white tick = whole library median</span></h2><svg id="axes"></svg></section>
   <section class="panel wide"><h2>Charts <span id="tcount"></span></h2>
     <div class="spot"><span class="lbl">spot check</span><span class="seg" id="spotseg"></span><span id="thinval"></span>
@@ -174,9 +191,28 @@ function filtered() {
 
 // tooltip
 const tip = $('tip');
-function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block';
-  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8);
-  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+// With a mark to anchor to ({left, right, top} in page px: the hovered column or dot), the tip sits
+// just right of it at a steady height (left of it when there's no room), so it never covers what's
+// being pointed at; without one it follows the mouse.
+const TIP_GAP = 10;
+function showTip(e, html, mark) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  let x, y;
+  if (mark) {
+    x = mark.right + TIP_GAP;
+    if (x + tip.offsetWidth > innerWidth - 8) x = mark.left - TIP_GAP - tip.offsetWidth;
+    y = mark.top;
+  } else {
+    x = e.clientX + 14; y = e.clientY + 14;
+  }
+  tip.style.left = Math.max(8, Math.min(x, innerWidth - tip.offsetWidth - 8)) + 'px';
+  tip.style.top = Math.max(8, Math.min(y, innerHeight - tip.offsetHeight - 8)) + 'px';
+}
+// an svg region (svg units) as page px for showTip
+function svgMark(svg, W, H, x0, x1, y0) {
+  const r = svg.getBoundingClientRect(), k = r.width / W;
+  return {left: r.left + x0 * k, right: r.left + x1 * k, top: r.top + y0 * (r.height / H)};
+}
 function hideTip() { tip.style.display = 'none'; }
 function chartTip(c) {
   return `<b>${c.name}</b><br><span class="m">drumchotic tier ${c.lv.toFixed(1)}, diff ${c.ch.toFixed(1)} │ human diff ${c.r ?? '-'} · ${c.n} plays</span>`
@@ -225,10 +261,11 @@ function drawHist(sel) {
   const bw = x(lo + BIN) - x(lo);
   // band behind the hovered column, drawn first so the bars sit on top of it
   const band = el('rect', {y: m.t, width: bw, height: H - m.t - m.b, fill: '#f0efec', 'fill-opacity': 0.08, rx: 2, visibility: 'hidden'}, svg);
+  const bars = [];
   for (let b = 0; b < nb; b++) {
     const a0 = lo + b * BIN, mid = a0 + BIN / 2, color = levelColor(raw ? diffToLevel(mid) : mid);
     if (solo && all[b]) el('rect', {x: x(a0) + 1, width: Math.max(bw - 2, 1), y: y(shape(all[b])), height: H - m.b - y(shape(all[b])), fill: '#2c2c2a', rx: 2}, svg);
-    if (got[b]) el('rect', {x: x(a0) + 1, width: Math.max(bw - 2, 1), y: y(got[b]), height: H - m.b - y(got[b]), fill: color, rx: 2}, svg);
+    if (got[b]) bars[b] = el('rect', {x: x(a0) + 1, width: Math.max(bw - 2, 1), y: y(got[b]), height: H - m.b - y(got[b]), fill: color, rx: 2}, svg);
   }
   // one hover target over the whole plot that snaps to the nearest bar with charts, so no gaps
   const filled = got.map((v, b) => v ? b : -1).filter(b => b >= 0);
@@ -238,53 +275,225 @@ function drawHist(sel) {
     const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) * W / box.width;
     const at = (px - m.l) / bw, b = filled.reduce((p, q) => Math.abs(q + 0.5 - at) < Math.abs(p + 0.5 - at) ? q : p);
     const a0 = lo + b * BIN;
-    band.setAttribute('x', x(a0)); band.setAttribute('visibility', 'visible');
+    band.setAttribute('x', x(a0)); band.setAttribute('visibility', 'visible'); light(bars[b], true);
     const examples = [...members[b]].sort((p, q) => q.n - p.n).slice(0, HIST_EXAMPLES)
       .map(c => `<br>${esc(c.name)} <span class="m">${raw ? 'diff ' + c.ch.toFixed(1) : 'tier ' + c.lv.toFixed(1)}</span>`).join('');
     showTip(e, `<b>${raw ? 'diff' : 'tier'} ${a0.toFixed(2)} to ${(a0 + BIN).toFixed(2)}</b>`
-      + ` <span class="m">${got[b]} charts${solo ? ` of ${all[b]} in the library` : ''}, most played:</span>${examples}`);
+      + ` <span class="m">${got[b]} charts${solo ? ` of ${all[b]} in the library` : ''}, most played:</span>${examples}`,
+      svgMark(svg, W, H, x(a0), x(a0) + bw, m.t));
   });
-  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); });
+  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); light(null); });
+}
+
+// highlight whatever mark is hovered, one at a time across every chart: a white outline, or with
+// fill set (the distribution's bars) the whole mark turns white
+let lit = null;
+function light(node, fill = false) {
+  if (lit === node) return;
+  if (lit) for (const k of ['stroke', 'stroke-width', 'fill']) if (lit.dataset[k] !== undefined) {
+    lit.setAttribute(k, lit.dataset[k]); delete lit.dataset[k];
+  }
+  lit = node;
+  if (!node) return;
+  const set = fill ? {fill: '#f0efec'} : {stroke: '#f0efec', 'stroke-width': 2};
+  for (const [k, v] of Object.entries(set)) { node.dataset[k] = node.getAttribute(k) || 'none'; node.setAttribute(k, v); }
 }
 
 // model vs leaderboard
 let scatterPts = [];
+// zoom and pan: wheel zooms about the cursor, drag pans, double-click resets; capped between the
+// full chart (1) and SCATTER_MAX_ZOOM, and the view never leaves the data
+const SCATTER_MAX_ZOOM = 12;
+const sview = {zoom: 1, cx: null, cy: null};
+let sgeo = null;
+function niceStep(span) {
+  const raw = span / 6, p = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(f => f * p).find(s => s >= raw);
+}
 function drawScatter(sel) {
   const cv = $('scatter'), W = cv.clientWidth || 600, H = 300, dpr = devicePixelRatio || 1, m = {l: 44, r: 10, t: 10, b: 34};
   cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
   const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
   const pool = ALL.filter(c => c.lb != null), lb = pool.map(c => c.lb), ho = pool.map(c => c.ho);
   const lo = Math.floor(Math.min(...lb, ...ho)), hi = Math.ceil(Math.max(...lb, ...ho));
-  const x = v => m.l + (v - lo) / (hi - lo) * (W - m.l - m.r), y = v => H - m.b - (v - lo) / (hi - lo) * (H - m.t - m.b);
+  const span = (hi - lo) / sview.zoom, half = span / 2;
+  const clamp = v => Math.min(Math.max(v ?? (lo + hi) / 2, lo + half), hi - half);
+  sview.cx = clamp(sview.cx); sview.cy = clamp(sview.cy);
+  const x0 = sview.cx - half, y0 = sview.cy - half, pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const x = v => m.l + (v - x0) / span * pw, y = v => H - m.b - (v - y0) / span * ph;
+  sgeo = {W, H, m, pw, ph, span, x0, y0, lo, hi};
+  const step = niceStep(span), digits = step < 1 ? (step < 0.5 ? 2 : 1) : 0;
   g.font = '11px system-ui'; g.fillStyle = '#c3c2b7'; g.strokeStyle = '#2c2c2a';
-  for (let v = lo; v <= hi; v++) { g.beginPath(); g.moveTo(m.l, y(v)); g.lineTo(W - m.r, y(v)); g.stroke();
-    g.textAlign = 'right'; g.fillText(v, m.l - 6, y(v) + 4); g.textAlign = 'center'; g.fillText(v, x(v), H - m.b + 16); }
+  for (let v = Math.ceil(y0 / step) * step; v <= y0 + span + 1e-9; v += step) {
+    g.beginPath(); g.moveTo(m.l, y(v)); g.lineTo(W - m.r, y(v)); g.stroke();
+    g.textAlign = 'right'; g.fillText(v.toFixed(digits), m.l - 6, y(v) + 4);
+  }
+  g.textAlign = 'center';
+  for (let v = Math.ceil(x0 / step) * step; v <= x0 + span + 1e-9; v += step) g.fillText(v.toFixed(digits), x(v), H - m.b + 16);
   g.font = '12px system-ui'; g.fillText('leaderboard', (W + m.l) / 2, H - 4);
   g.save(); g.translate(12, (H - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText('model (never saw the chart)', 0, 0); g.restore();
+  g.save(); g.beginPath(); g.rect(m.l, m.t, pw, ph); g.clip();
   g.setLineDash([4, 4]); g.strokeStyle = '#c3c2b7'; g.beginPath(); g.moveTo(x(lo), y(lo)); g.lineTo(x(hi), y(hi)); g.stroke(); g.setLineDash([]);
+  const selSet = new Set(sel.map(c => c.i)), solo = sel.length < ALL.length;
+  g.fillStyle = solo ? '#c3c2b7' : ACCENT; g.globalAlpha = solo ? 0.12 : 0.35;
+  const dot = sview.zoom > 3 ? 4 : 3;   // bigger once zoomed in enough to tell charts apart
+  pool.forEach(c => { if (!solo || !selSet.has(c.i)) g.fillRect(x(c.lb) - dot / 2, y(c.ho) - dot / 2, dot, dot); });
+  g.globalAlpha = 1;
+  const inside = (px, py) => px >= m.l && px <= W - m.r && py >= m.t && py <= H - m.b;
+  scatterPts = [];
+  if (solo) sel.forEach(c => { if (c.lb == null) return; const px = x(c.lb), py = y(c.ho);
+    g.beginPath(); g.arc(px, py, 4, 0, 7); g.fillStyle = levelColor(c.lv); g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1a19'; g.stroke();
+    if (inside(px, py)) scatterPts.push([px, py, c]); });
+  else pool.forEach(c => { const px = x(c.lb), py = y(c.ho); if (inside(px, py)) scatterPts.push([px, py, c]); });
+  g.restore();
   // above the diagonal the model rates a chart harder than its leaderboard, below it easier
   g.font = '600 11px system-ui'; g.fillStyle = '#8a897f';
   g.textAlign = 'left'; g.fillText('OVERESTIMATED', m.l + 10, m.t + 14);
   g.textAlign = 'right'; g.fillText('UNDERESTIMATED', W - m.r - 6, H - m.b - 10);
-  const selSet = new Set(sel.map(c => c.i)), solo = sel.length < ALL.length;
-  g.fillStyle = solo ? '#c3c2b7' : ACCENT; g.globalAlpha = solo ? 0.12 : 0.35;
-  pool.forEach(c => { if (!solo || !selSet.has(c.i)) g.fillRect(x(c.lb) - 1.5, y(c.ho) - 1.5, 3, 3); });
-  g.globalAlpha = 1;
-  scatterPts = [];
-  if (solo) sel.forEach(c => { if (c.lb == null) return; const px = x(c.lb), py = y(c.ho);
-    g.beginPath(); g.arc(px, py, 4, 0, 7); g.fillStyle = levelColor(c.lv); g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1a19'; g.stroke();
-    scatterPts.push([px, py, c]); });
-  else pool.forEach(c => scatterPts.push([x(c.lb), y(c.ho), c]));
+  if (sview.zoom > 1) { g.textAlign = 'right'; g.fillText(`${sview.zoom.toFixed(1)}× · double-click to reset`, W - m.r - 6, m.t + 14); }
   const pick = sel.filter(c => c.lb != null), rho = spearman(pick.map(c => c.lb), pick.map(c => c.ho));
   $('sp').textContent = isNaN(rho) ? `${pick.length} on the leaderboard` : `spearman ${rho.toFixed(3)} over ${pick.length} leaderboard charts`;
+}
+{
+  const cv = $('scatter');
+  const dataAt = e => { const b = cv.getBoundingClientRect(), {m, H, pw, ph, span, x0, y0} = sgeo;
+    const mx = e.clientX - b.left, my = e.clientY - b.top;
+    return {mx, my, dx: x0 + (mx - m.l) / pw * span, dy: y0 + (H - m.b - my) / ph * span}; };
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const {mx, my, dx, dy} = dataAt(e), {m, H, pw, ph, lo, hi} = sgeo;
+    const zoom = Math.min(Math.max(sview.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2), 1), SCATTER_MAX_ZOOM);
+    const span = (hi - lo) / zoom;   // keep the point under the cursor where it is
+    sview.zoom = zoom;
+    sview.cx = dx - (mx - m.l) / pw * span + span / 2;
+    sview.cy = dy - (H - m.b - my) / ph * span + span / 2;
+    hideTip(); $('sring').style.display = 'none'; drawScatter(current);
+  }, {passive: false});
+  let drag = null;
+  cv.addEventListener('mousedown', e => { drag = {x: e.clientX, y: e.clientY, cx: sview.cx, cy: sview.cy}; cv.style.cursor = 'grabbing'; });
+  addEventListener('mousemove', e => {
+    if (!drag) return;
+    const {pw, ph, span} = sgeo;
+    sview.cx = drag.cx - (e.clientX - drag.x) / pw * span;
+    sview.cy = drag.cy + (e.clientY - drag.y) / ph * span;
+    hideTip(); $('sring').style.display = 'none'; drawScatter(current);
+  });
+  addEventListener('mouseup', () => { if (drag) { drag = null; cv.style.cursor = ''; } });
+  cv.addEventListener('dblclick', () => { sview.zoom = 1; sview.cx = sview.cy = null; drawScatter(current); });
 }
 $('scatter').addEventListener('mousemove', e => {
   const b = e.target.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
   let best = null, bd = 100;
-  for (const [px, py, c] of scatterPts) { const d = (px - mx) ** 2 + (py - my) ** 2; if (d < bd) { bd = d; best = c; } }
-  best ? showTip(e, chartTip(best) + `<br><span class="m">leaderboard ${best.lb.toFixed(2)} · model ${best.ho.toFixed(2)}</span>`) : hideTip();
+  for (const p of scatterPts) { const d = (p[0] - mx) ** 2 + (p[1] - my) ** 2; if (d < bd) { bd = d; best = p; } }
+  const ring = $('sring');
+  if (!best) { hideTip(); ring.style.display = 'none'; return; }
+  const [px, py, c] = best;
+  Object.assign(ring.style, {left: px + 'px', top: py + 'px', display: 'block'});
+  const cb = $('scatter').getBoundingClientRect();
+  showTip(e, chartTip(c) + `<br><span class="m">leaderboard ${c.lb.toFixed(2)} · model ${c.ho.toFixed(2)}</span>`,
+          {left: cb.left + px - 8, right: cb.left + px + 8, top: cb.top + py - 12});
 });
-$('scatter').addEventListener('mouseleave', hideTip);
+$('scatter').addEventListener('mouseleave', () => { hideTip(); $('sring').style.display = 'none'; });
+
+// tournaments: each human tier at its median drumchotic tier, as a grid or a dot chart
+const LADDER_FROM = 2024;   // as sources/dmt.py: older tournaments numbered tiers their own way
+const yearOf = g => +(g.match(/\b(20\d\d)\b/) || [0, 0])[1];
+const SHORT = [[/Icebreaker/, 'IB'], [/Summer Blast/, 'SB'], [/Legacy Cup/, 'LC'], [/Drummer's Monthly (\d)/, 'DM'], [/Birdman/, 'BX']];
+// oldest first by bracket start date (data/results)
+const startOf = g => (DATA.started || {})[g.replace(' Setlist', '')] || String(yearOf(g));
+const byDate = (a, b) => startOf(a).localeCompare(startOf(b)) || a.localeCompare(b);
+function shortName(g) {
+  const hit = SHORT.find(([re]) => re.test(g));
+  const tail = !hit ? '' : hit[1] === 'DM' ? g.match(hit[0])[1] : yearOf(g) ? String(yearOf(g) % 100).padStart(2, '0') : '';
+  return hit ? hit[1] + tail : g;
+}
+let tview = 'dots';
+try { tview = localStorage.getItem('drumchotic-tourney-view') || 'dots'; } catch (e) {}
+document.querySelectorAll('#tview button').forEach(b => b.onclick = () => {
+  tview = b.dataset.v; try { localStorage.setItem('drumchotic-tourney-view', tview); } catch (e) {}
+  drawTournaments();
+});
+// grid columns: the tier each tournament gave, or (before LADDER_FROM) the modern tier nearest its median
+let tplace = 'given';
+try { tplace = localStorage.getItem('drumchotic-tplace') || 'given'; } catch (e) {}
+document.querySelectorAll('#tplace button').forEach(b => b.onclick = () => {
+  tplace = b.dataset.v; try { localStorage.setItem('drumchotic-tplace', tplace); } catch (e) {}
+  drawTournaments();
+});
+function tourneyTip(e, chart, g, t, v, cs) {
+  const top3 = [...cs].sort((p, q) => q.n - p.n).slice(0, 3).map(c => `<br>${esc(c.name)} <span class="m">tier ${c.lv.toFixed(1)}</span>`).join('');
+  showTip(e, `<b>${esc(g)}, T${t}</b> <span class="m">median tier ${v.toFixed(1)}, ${cs.length} songs, most played:</span>${top3}`, chart);
+}
+function drawTournaments() {
+  document.querySelectorAll('#tview button').forEach(b => b.classList.toggle('on', b.dataset.v === tview));
+  document.querySelectorAll('#tplace button').forEach(b => b.classList.toggle('on', b.dataset.v === tplace));
+  $('tplace').style.display = tview === 'grid' ? '' : 'none';
+  const groups = new Map();
+  for (const c of ALL) for (const [g, t] of c.tn) {
+    if (!groups.has(g)) groups.set(g, new Map());
+    const tiers = groups.get(g); if (!tiers.has(t)) tiers.set(t, []); tiers.get(t).push(c);
+  }
+  // per tournament: [human tier, median drumchotic tier, charts], easiest first
+  const meds = new Map([...groups].map(([g, tiers]) =>
+    [g, [...tiers].map(([t, cs]) => [t, median(cs.map(c => c.lv)), cs]).sort((a, b) => a[0] - b[0])]));
+  (tview === 'dots' ? tourneyDots : tourneyGrid)(meds);
+}
+function tourneyGrid(meds) {
+  // most recent at the top; "closest tier" moves pre-LADDER_FROM tiers to the modern tier nearest their median
+  const names = [...meds.keys()].sort((a, b) => startOf(b).localeCompare(startOf(a)) || a.localeCompare(b));
+  const cols = Array.from({length: 8}, (_, i) => i + 1), cells = [];
+  const snapped = g => tplace === 'closest' && yearOf(g) < LADDER_FROM;
+  const column = (g, t, v) => snapped(g) ? Math.min(Math.max(Math.round(v), 1), 8) : t;
+  const head = '<tr><th>tournament</th>' + cols.map(t => `<th>T${t}</th>`).join('') + '</tr>';
+  const body = names.map(g => {
+    const old = snapped(g);
+    return `<tr><td title="${esc(g)}">${esc(shortName(g))}</td>` + cols.map(col => {
+      const here = meds.get(g).filter(([t, v]) => column(g, t, v) === col);
+      if (!here.length) return '<td class="empty">·</td>';
+      return '<td>' + here.map(([t, v, cs]) => {
+        cells.push([g, t, v, cs]);
+        return `<span data-c="${cells.length - 1}" style="color:${levelColor(v)}">${v.toFixed(1)}${old ? `<sub>T${t}</sub>` : ''}</span>`;
+      }).join(' ') + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  $('tourn').innerHTML = `<table>${head}${body}</table>`;
+  $('tourn').querySelectorAll('[data-c]').forEach(s => {
+    s.addEventListener('mousemove', e => tourneyTip(e, null, ...cells[+s.dataset.c]));
+    s.addEventListener('mouseleave', hideTip);
+  });
+}
+function tourneyDots(meds) {
+  // oldest to newest, left to right; one hover target over the whole plot, picking the column
+  const names = [...meds.keys()].sort(byDate);
+  $('tourn').innerHTML = '<svg></svg>';
+  const svg = $('tourn').firstChild, W = $('tourn').clientWidth || 900, H = 300, m = {l: 44, r: 10, t: 12, b: 30};
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H);
+  const top = Math.ceil(Math.max(9, ...[...meds.values()].flat().map(d => d[1])));
+  const col = (W - m.l - m.r) / names.length, x = i => m.l + col * (i + 0.5), y = v => H - m.b - v / top * (H - m.t - m.b);
+  for (let v = 0; v <= top; v++) {
+    el('line', {x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: '#2c2c2a'}, svg);
+    el('text', {x: m.l - 6, y: y(v) + 4, 'text-anchor': 'end', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = v;
+  }
+  const band = el('rect', {y: m.t, width: col, height: H - m.t - m.b, fill: '#f0efec', 'fill-opacity': 0.06, rx: 3, visibility: 'hidden'}, svg);
+  const dots = new Map();   // the [tier, median, charts] entry -> its circle
+  names.forEach((g, i) => {
+    const pts = meds.get(g);
+    el('line', {x1: x(i), x2: x(i), y1: y(pts[0][1]), y2: y(pts[pts.length - 1][1]), stroke: '#3a3a37', 'stroke-width': 2}, svg);
+    for (const p of pts) dots.set(p, el('circle', {cx: x(i), cy: y(p[1]), r: 6, fill: levelColor(p[1]), stroke: '#1a1a19', 'stroke-width': 1.5}, svg));
+    el('text', {x: x(i), y: H - m.b + 18, fill: '#c3c2b7', 'font-size': 11, 'text-anchor': 'middle'}, svg).textContent = shortName(g);
+  });
+  const hit = el('rect', {x: m.l, y: 0, width: W - m.l - m.r, height: H - m.b, fill: 'transparent'}, svg);
+  hit.addEventListener('mousemove', e => {
+    const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) * W / box.width, py = (e.clientY - box.top) * H / box.height;
+    const i = Math.min(Math.max(Math.floor((px - m.l) / col), 0), names.length - 1), g = names[i];
+    band.setAttribute('x', m.l + col * i); band.setAttribute('visibility', 'visible');
+    // the tier dot nearest the mouse height in that column
+    const near = meds.get(g).reduce((p, q) => Math.abs(y(q[1]) - py) < Math.abs(y(p[1]) - py) ? q : p);
+    light(dots.get(near));
+    tourneyTip(e, svgMark(svg, W, H, m.l + col * i, m.l + col * (i + 1), m.t), g, ...near);
+  });
+  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); light(null); });
+}
 
 // axis shares
 function drawAxes(sel) {
@@ -303,10 +512,11 @@ function drawAxes(sel) {
   const total = sel.length ? median(sel.map(c => c.sh.reduce((p, q) => p + q, 0))) : 0;
   // band behind the hovered row, drawn first so the marks sit on top of it
   const band = el('rect', {x: 0, width: W, height: row, fill: '#f0efec', 'fill-opacity': 0.06, rx: 3, visibility: 'hidden'}, svg);
+  const bars = {};
   order.forEach((a, k) => {
     const yy = m.t + row * k + row / 2, s = stats[a];
     el('text', {x: m.l - 10, y: yy + 4, 'text-anchor': 'end', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = AXES[a];
-    if (s) { el('rect', {x: x(s[0]), y: yy - 6, width: Math.max(x(s[2]) - x(s[0]), 2), height: 12, fill: ACCENT, rx: 3}, svg);
+    if (s) { bars[a] = el('rect', {x: x(s[0]), y: yy - 6, width: Math.max(x(s[2]) - x(s[0]), 2), height: 12, fill: ACCENT, rx: 3}, svg);
       el('circle', {cx: x(s[1]), cy: yy, r: 4.5, fill: '#f0efec', stroke: '#1a1a19', 'stroke-width': 1.5}, svg);
       el('text', {x: x(s[2]) + 8, y: yy + 4, fill: '#8a897f', 'font-size': 11}, svg).textContent = total ? Math.round(s[1] / total * 100) + '%' : ''; }
     el('line', {x1: x(libMed[a]), x2: x(libMed[a]), y1: yy - 9, y2: yy + 9, stroke: '#f0efec', 'stroke-width': 2}, svg);
@@ -316,10 +526,11 @@ function drawAxes(sel) {
   hit.addEventListener('mousemove', e => {
     const box = svg.getBoundingClientRect(), py = (e.clientY - box.top) * H / box.height;
     const k = Math.min(Math.max(Math.floor((py - m.t) / row), 0), AXES.length - 1), a = order[k], s = stats[a];
-    band.setAttribute('y', m.t + row * k); band.setAttribute('visibility', 'visible');
-    showTip(e, `<b>${AXES[a]}</b><br>` + (s ? `filtered: median ${s[1].toFixed(3)}, middle half ${s[0].toFixed(3)} to ${s[2].toFixed(3)}<br>` : '') + `library median ${libMed[a].toFixed(3)}`);
+    band.setAttribute('y', m.t + row * k); band.setAttribute('visibility', 'visible'); light(bars[a] || null);
+    showTip(e, `<b>${AXES[a]}</b><br>` + (s ? `filtered: median ${s[1].toFixed(3)}, middle half ${s[0].toFixed(3)} to ${s[2].toFixed(3)}<br>` : '') + `library median ${libMed[a].toFixed(3)}`,
+      svgMark(svg, W, H, s ? x(s[0]) : m.l, Math.max(s ? x(s[2]) : 0, x(libMed[a])) + 44, m.t + row * k));
   });
-  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); });
+  hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); light(null); });
   el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "share of each chart's total (a chart's axes add up to how hard the model rates it)";
 }
 
@@ -384,7 +595,7 @@ let current = ALL;
 function update() {
   try { localStorage.setItem('drumchotic-filters', JSON.stringify(Object.fromEntries(CONTROLS.map(k => [k, $(k).value])))); } catch (e) {}
   current = filtered();
-  drawHist(current); drawScatter(current); drawAxes(current); drawTable(current);
+  drawHist(current); drawScatter(current); drawTournaments(); drawAxes(current); drawTable(current);
 }
 addEventListener('resize', () => update());
 update();

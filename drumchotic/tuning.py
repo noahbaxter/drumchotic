@@ -48,6 +48,12 @@ SPEED_WINDOW_S = 1
 # Density: notes/s per chunk of this many quarter notes. A fixed tick span, so 3/16 and 13/4
 # bars weigh the same; chunks with no notes are silence and skipped.
 DENSITY_BEATS = 4
+# No rate may come from time spans shorter than anyone could play: a density chunk counts as at
+# least MIN_CHUNK_S long (4 beats only get shorter above 480 BPM, so joke tempo maps can't turn one
+# note into thousands of notes/s), and each gap in a run as at least MIN_GAP_MS (about 67 notes/s,
+# past any limb, so stacked or near-stacked notes can't either).
+MIN_CHUNK_S = 0.5
+MIN_GAP_MS = 15.0
 # Density at these quantiles of the chart's playing time (chunks weighted by duration):
 # p50 = half the time you're playing, it's at least this dense.
 DENSITY_QUANTILES = (0.5, 0.75, 0.9)

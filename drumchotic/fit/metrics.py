@@ -24,5 +24,15 @@ def tier_accuracy(labels, score):
     for lab, md5 in labels:
         if md5 in score:
             groups[lab.group].append((lab.tier, score[md5]))
-    n = sum(map(len, groups.values()))
-    return sum(pairwise(*zip(*v)) * len(v) for v in groups.values()) / n
+    # a tournament with no cross-tier pair scored (e.g. none of its songs on the leaderboard) has nothing to add
+    scored = [(pairwise(*zip(*v)), len(v)) for v in groups.values()]
+    scored = [(acc, n) for acc, n in scored if acc == acc]
+    return sum(acc * n for acc, n in scored) / sum(n for _, n in scored)
+
+
+def community_accuracy(pairs, score):
+    """Share of community (harder, easier) pairs the score orders the same way, and the pairs it
+    gets wrong. pairs: [(claim, harder md5, easier md5)]; score: md5 -> value."""
+    used = [(c, h, e) for c, h, e in pairs if h in score and e in score]
+    wrong = [p for p in used if score[p[1]] <= score[p[2]]]
+    return (1 - len(wrong) / len(used) if used else float('nan')), wrong

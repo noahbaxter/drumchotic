@@ -1,6 +1,8 @@
 """Rate helpers over event times (ms, sorted)."""
 import numpy as np
 
+from ..tuning import MIN_GAP_MS
+
 
 def fastest_run_at(times, n):
     """(notes/s, start ms, end ms) of the fastest run of n consecutive events."""
@@ -8,7 +10,7 @@ def fastest_run_at(times, n):
         return 0.0, 0.0, 0.0
     span = times[n - 1:] - times[:len(times) - n + 1]
     i = int(np.argmin(span))
-    return float((n - 1) / max(span[i], 1.0) * 1000.0), float(times[i]), float(times[i + n - 1])
+    return float((n - 1) / max(span[i], (n - 1) * MIN_GAP_MS) * 1000.0), float(times[i]), float(times[i + n - 1])
 
 
 def fastest_run(times, n):
