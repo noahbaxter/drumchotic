@@ -75,7 +75,6 @@ def build():
             'lv': round(rater.level(r.pred[m], floor=None), 2),
             'rbv': round(rater.rock_band(r.pred[m], floor=None), 2),
             'rb': rock_band.get(m),
-            'ch': round(rater.charter(r.pred[m]), 2),
             'r': rated if rated >= 0 else None,
             'lb': round(float(r.fit.difficulty[m]), 3) if m in pool else None,
             'ho': round(float(r.held_out[m]), 3) if m in pool else None,
@@ -86,14 +85,19 @@ def build():
             'why': why[i],
         })
     groups = sorted({g for v in tiers.values() for g, _ in v})
-    medians = [[int(t), round(rater.charter(v), 3)] for t, v in zip(rater.level.levels, rater.level.medians)]
     # per reference (DMT tournaments, official Rock Band): each human tier's median on its own scale, for
-    # the histogram's markers; toDmt turns a Rock Band scale value into a DMT tier, so colours match
+    # the histogram's markers; toDmt turns a Rock Band scale value into a DMT tier, so colours match;
+    # fromRaw turns a raw difficulty (leaderboard or model) into that tier, for the scatter
     lv, rb = rater.level, rater.rock_band
-    refs = {'dmt': {'marks': [[int(t), round(lv(v), 3)] for t, v in zip(lv.levels, lv.medians)]},
+    refs = {'dmt': {'marks': [[int(t), round(lv(v), 3)] for t, v in zip(lv.levels, lv.medians)],
+                    'fromRaw': [round(lv.intercept, 4), round(lv.slope, 4)]},
             'rb': {'marks': [[int(t), round(rb(v), 3)] for t, v in zip(rb.levels, rb.medians)],
+                   'fromRaw': [round(rb.intercept, 4), round(rb.slope, 4)],
                    'toDmt': [round(lv.intercept - lv.slope * rb.intercept / rb.slope, 4), round(lv.slope / rb.slope, 4)]}}
-    data = {'axes': axes, 'groups': groups, 'charts': charts, 'tierMedians': medians, 'refs': refs, 'started': tournament_dates(),
+    # how far the note rating lands from the play rating on charts it never saw, in raw units
+    miss = np.abs(np.subtract(*r.pool_scores()))
+    accuracy = {'median': round(float(np.median(miss)), 4), 'q80': round(float(np.quantile(miss, 0.8)), 4), 'n': len(miss)}
+    data = {'axes': axes, 'groups': groups, 'charts': charts, 'refs': refs, 'accuracy': accuracy, 'started': tournament_dates(),
             'built': f'{datetime.now():%Y-%m-%d}'}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     DATA.write_text(json.dumps(data, separators=(',', ':')))

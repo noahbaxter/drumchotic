@@ -7,13 +7,14 @@
 <style>
   :root {
     --surface: #1a1a19; --raised: #222221; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8a897f;
-    --grid: #2c2c2a; --line: #3a3a37; --accent: #3987e5;
+    --grid: #2c2c2a; --line: #3a3a37; --accent: #3987e5; --bad: #e34948; --easy: #6aa8f2;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--surface); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { padding: 20px 24px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
   header .ref { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 8px; }
-  #ref button { width: 48px; padding: 4px 0; }
+  #ref button { padding: 4px 12px; }
+  header .ref-note { flex-basis: 100%; font-size: 12px; color: var(--ink-3); margin-top: -6px; }
   h1 { font-size: 18px; font-weight: 600; margin: 0; }
   .bar { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--grid);
          padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: flex-end; }
@@ -46,12 +47,18 @@
   .panel { min-width: 0; }
   .panel h2 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
   .panel h2 span { color: var(--ink-3); font-weight: 400; }
+  .panel .cap { color: var(--ink-3); font-size: 12px; margin: -4px 0 8px; }
   .wide { grid-column: 1 / -1; }
   canvas, svg { display: block; width: 100%; }
   .tip { position: fixed; pointer-events: none; background: #2a2a28; border: 1px solid var(--line); border-radius: 6px;
          padding: 6px 9px; font-size: 12px; color: var(--ink); display: none; z-index: 10; max-width: 340px; }
   .tip b { font-weight: 600; }
   .tip .m { color: var(--ink-2); }
+  .tip .rows, .tip .facts { display: grid; justify-content: start; gap: 2px 12px; font-variant-numeric: tabular-nums; }
+  .tip .rows { grid-template-columns: auto auto auto auto; margin-top: 6px; }
+  .tip .facts { grid-template-columns: auto minmax(0, 240px); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--ink-2); }
+  .tip .k { color: var(--ink-3); }
+  .tip .miss { font-weight: 600; margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
   th { color: var(--ink-3); font-weight: 500; font-size: 12px; cursor: pointer; user-select: none; position: sticky; top: var(--bar, 57px); background: var(--surface); }
@@ -84,6 +91,8 @@
   /* white ring over the hovered dot on a chart */
   .ring { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid var(--ink);
           border-radius: 50%; pointer-events: none; display: none; }
+  /* from the hovered dot to the dashed line: how far the notes missed the plays */
+  .miss-line { position: absolute; width: 2px; margin-left: -1px; pointer-events: none; display: none; }
   .holder { position: relative; }
   #tourn td sub { color: var(--ink-3); font-size: 10px; font-weight: 400; margin-left: 2px; vertical-align: baseline; }
   #tourn svg { width: 100%; }
@@ -93,26 +102,28 @@
 <body>
 <header>
   <h1>drumchotic explorer <span class="built">built <span id="built"></span></span></h1>
-  <span class="ref">tiers relative to <span class="seg" id="ref"><button data-v="dmt" title="Drummer's Monthly Tournament tiers">DMT</button><button data-v="rb" title="official Rock Band setlist tiers">RB</button></span></span>
+  <span class="ref">difficulty on the <span class="seg" id="ref"><button data-v="dmt" title="Drummer's Monthly tournament tiers">Drummer's Monthly</button><button data-v="rb" title="official Rock Band setlist tiers">Rock Band</button></span> scale</span>
+  <span class="ref-note" id="refnote"></span><span class="ref-note" id="refacc"></span>
 </header>
 <div class="bar">
   <label class="field"><span>search</span><input id="q" placeholder="artist, song, charter, genre..." title="matches artist, title, album, charter, genre, year; commas match any term"></label>
   <label class="field"><span id="tnlabel">tournament</span><select id="tn"></select></label>
   <div class="pair">
-    <label class="field"><span>drumchotic</span><select id="dt"><option value="">any tier</option></select></label>
+    <label class="field"><span>drumchotic</span><select id="dt"><option value="">any</option></select></label>
     <label class="field sep"><span>human</span><select id="tier"><option value="">any tier</option></select></label>
   </div>
-  <label class="field"><span>hard for</span><select id="why"><option value="">anything</option></select></label>
-  <label class="field"><span>min plays</span><input id="ns" class="num" type="number" min="0" step="1" placeholder="0"></label>
+  <label class="field"><span>skill</span><select id="why"><option value="">any</option></select></label>
+  <label class="field"><span>min players</span><input id="ns" class="num" type="number" min="0" step="1" placeholder="0"></label>
   <button id="reset">reset</button>
 </div>
 <main>
-  <section class="panel"><h2><span class="seg" id="scale"><button data-v="d">diff</button><button data-v="lv">tier</button></span> <span>drumchotic's, filtered charts over the grey shape of the whole library</span></h2><svg id="hist"></svg></section>
-  <section class="panel"><h2>Model vs leaderboard <span id="sp"></span></h2><div class="holder"><canvas id="scatter"></canvas><div class="ring" id="sring"></div></div></section>
+  <section class="panel"><h2>Difficulty <span>grey = whole library</span></h2><svg id="hist"></svg></section>
+  <section class="panel"><h2>note vs play <span id="sp"></span></h2>
+    <p class="cap">note: our rating. play: how hard players found it. On the line = rated right.<span id="acc"></span></p><div class="holder"><canvas id="scatter"></canvas><div class="miss-line" id="sline"></div><div class="ring" id="sring"></div></div></section>
   <section class="panel wide"><h2>Tournaments <span class="seg" id="tview"><button data-v="grid">grid</button><button data-v="dots">chart</button></span>
-    <span class="seg" id="tplace"><button data-v="given">given tier</button><button data-v="closest">closest tier</button></span>
+    <span class="seg" id="tplace"><button data-v="given">as placed</button><button data-v="closest">as rated</button></span>
     <span id="tsub"></span></h2><div id="tourn"></div></section>
-  <section class="panel wide"><h2>What makes charts hard <span>bar = middle half of charts, dot = median, white tick = whole library median</span></h2><svg id="axes"></svg></section>
+  <section class="panel wide"><h2>What makes charts hard <span>bar = middle half, dot = typical, tick = whole library</span></h2><svg id="axes"></svg></section>
   <section class="panel wide"><h2>Charts <span id="tcount"></span></h2>
     <div class="spot"><span class="lbl">spot check</span><span class="seg" id="spotseg"></span><span id="thinval"></span>
       <input type="hidden" id="samples" value="6"></div>
@@ -125,7 +136,8 @@ const {axes: AXES, groups: GROUPS, charts: ALL} = DATA;
 document.getElementById('built').textContent = DATA.built;
 const STOPS = ['#9085e9', '#3987e5', '#1baf7a', '#eda100', '#eb6834', '#e34948'];   // difficulty ramp, as in plots.py
 // the page's primary colour lives in CSS (--accent); charts read it from there
-const ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();   // canvas can't read var()
+const ACCENT = cssVar('--accent');
 const ROWS = 300;   // table rows drawn at a time; scrolling near the end draws the next batch
 let rowsShown = ROWS;
 // spot check slider stops; one past the last means every chart
@@ -164,24 +176,39 @@ const RB_ORDER = ['RB1', 'RB1 DLC', 'RB2', 'RB2 DLC', 'RB3', 'Green Day RB', 'Le
 const rbShort = g => g.replace(/Rock Band (\d)/, 'RB$1').replace('Rock Band', 'RB');
 const range = (a, b) => Array.from({length: b - a + 1}, (_, i) => a + i);
 const REFS = {
-  dmt: {name: 'DMT', prefix: 'T', scale: c => c.lv, human: c => c.tn, toLevel: v => v, marks: DATA.refs.dmt.marks,
-        tiers: range(1, 8), dtTop: 8, groups: GROUPS, groupLabel: 'tournament', anyGroup: 'any tournament',
-        help: 'drumchotic: estimated DMT tier, 1 to 8 (past 8 keeps counting, 0 = below tier 1)',
+  // unit labels drumchotic's own numbers (DM 4.6); prefix labels the human tiers they're read against (T3)
+  dmt: {name: 'DMT', unit: 'DM', prefix: 'T', scale: c => c.lv, human: c => c.tn, toLevel: v => v, marks: DATA.refs.dmt.marks,
+        tiers: range(1, 8), dtTop: 8, groups: GROUPS, groupLabel: 'tournament', anyGroup: 'any tournament', humanKind: 'DMT tournament',
+        note: "DM 3 = plays like a tier 3 song in a Drummer's Monthly tournament.",
+        help: "drumchotic: difficulty on the Drummer's Monthly scale, DM 1 to 8 (past 8 keeps counting, below 1 = easier than tier 1)",
         humanHelp: 'human: where a DMT tournament placed it (hover a cell for which)',
-        panel: 'median drumchotic tier of each human tier; only 2024 on sets the tier scale'},
-  rb: {name: 'RB', prefix: 'T',scale: c => c.rbv, human: c => c.rb ? [[c.rb[1], c.rb[0]]] : [], toLevel: v => RB_A + RB_B * v,
+        panel: "each tier's typical DM"},
+  rb: {name: 'RB', unit: 'RB', prefix: 'T', scale: c => c.rbv, human: c => c.rb ? [[c.rb[1], c.rb[0]]] : [], toLevel: v => RB_A + RB_B * v, humanKind: 'official Rock Band',
+       note: 'RB 3 = plays like a tier 3 song in official Rock Band.',
        marks: DATA.refs.rb.marks, tiers: range(0, 6), dtTop: 10, groupLabel: 'rock band game', anyGroup: 'any official chart',
        groups: [...new Set(ALL.filter(c => c.rb).map(c => c.rb[1]))].sort((a, b) =>
          ((RB_ORDER.indexOf(rbShort(a)) + 1) || 99) - ((RB_ORDER.indexOf(rbShort(b)) + 1) || 99)),
-       help: 'drumchotic: estimated official Rock Band drum tier, 0 to 6 (past 6 keeps counting)',
+       help: 'drumchotic: difficulty on the Rock Band scale, RB 0 to 6 (past 6 keeps counting)',
        humanHelp: 'human: official Rock Band drum tier, 0 (warmup) to 6 (devils), hover for the game',
-       panel: 'median drumchotic RB tier of each official Rock Band tier, per game (The Beatles left out: its tiers rank its own easy setlist)'},
+       panel: "each tier's typical RB, per game (The Beatles left out)"},
 };
 let refMode = 'dmt';
 try { refMode = localStorage.getItem('drumchotic-ref') || 'dmt'; } catch (e) {}
 if (!REFS[refMode]) refMode = 'dmt';
 const REF = () => REFS[refMode];
+// raw difficulty (the leaderboard fit's and the model's own unit) -> the reference's tier
+const rawToTier = v => { const [a, b] = DATA.refs[refMode].fromRaw; return a + b * v; };
+// where a raw difficulty sits in the library: 'top 14%' means harder than 86% of charts
+const LIB_D = ALL.map(c => c.d).sort((a, b) => a - b);
+function topPct(raw) {
+  let lo = 0, hi = LIB_D.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (LIB_D[mid] <= raw) lo = mid + 1; else hi = mid; }
+  const t = Math.max(100 * (LIB_D.length - lo) / LIB_D.length, 0.1);
+  return `top ${t < 10 ? t.toFixed(1) : Math.round(t)}%`;
+}
+const lengthTiers = c => refMode === 'rb' ? c.ln / RB_B : c.ln;   // c.ln is in DMT tiers
 const tierOf = c => REF().scale(c);
+const rated = v => `${REF().unit}&nbsp;${v.toFixed(1)}`;   // a drumchotic number with its scale: 'DM 4.6'
 const tierColor = v => levelColor(REF().toLevel(v));
 const humanTiers = c => REF().human(c);
 function tierText(c) { return humanTiers(c).map(([g, t]) => `${REF().prefix}${t} ${g.replace(' Setlist', '')}`).join(', '); }
@@ -192,16 +219,22 @@ function refControls() {
   $('tnlabel').textContent = R.groupLabel;
   $('tn').innerHTML = `<option value="">all charts</option><option value="*">${R.anyGroup}</option>` + R.groups.map(g => `<option>${g}</option>`).join('');
   $('tier').innerHTML = '<option value="">any tier</option>' + R.tiers.map(t => `<option value="${t}">tier ${t}</option>`).join('');
-  // drumchotic tier: whole steps (5 = 5.0 to 5.9), with everything from dtTop up in one
-  $('dt').innerHTML = '<option value="">any tier</option>' + range(0, R.dtTop - 1).map(t =>
-    `<option value="${t}">${t === 0 && refMode === 'dmt' ? 'tier below 1' : 'tier ' + t}</option>`).join('') + `<option value="${R.dtTop}">tier ${R.dtTop}+</option>`;
+  // drumchotic: whole steps (5 = 5.0 to 5.9), with everything from dtTop up in one
+  $('dt').innerHTML = '<option value="">any</option>' + range(0, R.dtTop - 1).map(t =>
+    `<option value="${t}">${t === 0 && refMode === 'dmt' ? 'below DM 1' : R.unit + ' ' + t}</option>`).join('') + `<option value="${R.dtTop}">${R.unit} ${R.dtTop}+</option>`;
   $('tsub').textContent = R.panel;
+  // accuracy is in raw units; the scale's slope turns it into this scale's steps
+  const acc = q => (DATA.accuracy[q] * DATA.refs[refMode].fromRaw[1]).toFixed(1);
+  $('refnote').textContent = R.note;
+  $('refacc').textContent = `Usually within ±${acc('q80')} of how players score it.`;
+  $('acc').textContent = ` 8 in 10 within ${acc('q80')}.`;
   document.querySelectorAll('#ref button').forEach(b => b.classList.toggle('on', b.dataset.v === refMode));
 }
 refControls();
 document.querySelectorAll('#ref button').forEach(b => b.onclick = () => {
   if (b.dataset.v === refMode) return;
   refMode = b.dataset.v; try { localStorage.setItem('drumchotic-ref', refMode); } catch (e) {}
+  sview.zoom = 1; sview.cx = sview.cy = null;   // the scatter's axes change scale
   refControls(); update();   // the tier filters meant tiers on the old reference, so they start over
 });
 AXES.forEach((a, i) => $('why').insertAdjacentHTML('beforeend', `<option value="${i}">${a}</option>`));
@@ -263,42 +296,19 @@ function svgMark(svg, W, H, x0, x1, y0) {
   return {left: r.left + x0 * k, right: r.left + x1 * k, top: r.top + y0 * (r.height / H)};
 }
 function hideTip() { tip.style.display = 'none'; }
-function chartTip(c) {
-  return `<b>${c.name}</b><br><span class="m">drumchotic DMT tier ${c.lv.toFixed(1)}, RB tier ${c.rbv.toFixed(1)}, diff ${c.ch.toFixed(1)} │ human diff ${c.r ?? '-'} · ${c.n} plays</span>`
-    + (c.tn.length ? `<br><span class="m">${c.tn.map(([g, t]) => `T${t} ${g.replace(' Setlist', '')}`).join(', ')}</span>` : '')
-    + (c.rb ? `<br><span class="m">official RB tier ${c.rb[0]} (${esc(c.rb[1])})</span>` : '')
-    + (c.why.length ? `<br>hard for: ${c.why.map(i => AXES[i]).join(', ')}` : '')
-    + (c.ln <= -0.05 ? `<br><span class="m">length ${c.ln.toFixed(1)} tiers (long charts rate easier)</span>` : '');
-}
 
-// histogram: diff with each DMT tier's median diff marked, or drumchotic's tier on the reference's scale
-// with each of the reference's human tiers marked at its median
-const TM = DATA.tierMedians;   // [DMT tier, median diff]
-const HISTS = {
-  d: () => ({key: c => c.ch, bin: 0.1, name: 'diff', marks: TM.map(([t, v]) => ['T' + t, v]), toLevel: v => toLevel(v, TM),
-             label: 'drumchotic diff (dotted lines: its median at each DMT tier)'}),
-  lv: () => { const R = REF(); return {key: R.scale, bin: refMode === 'rb' ? 0.5 : 0.25, cap: refMode === 'rb' ? 30 : 20, name: R.name + ' tier', marks: R.marks.map(([t, v]) => [R.prefix + t, v]),
-    toLevel: R.toLevel, label: `drumchotic ${R.name} tier (dotted lines: its median at each ${refMode === 'rb' ? 'official Rock Band' : 'DMT'} tier)`}; },
-};
-function toLevel(d, TM) {      // a scale with DMT tier medians marked -> DMT tier, for colouring it like the tier view
-  const n = TM.length;
-  if (d <= TM[0][1]) return TM[0][0] - (TM[0][1] - d) / (TM[1][1] - TM[0][1]) * (TM[1][0] - TM[0][0]);
-  if (d >= TM[n - 1][1]) return TM[n - 1][0] + (d - TM[n - 1][1]) / (TM[n - 1][1] - TM[n - 2][1]) * (TM[n - 1][0] - TM[n - 2][0]);
-  for (let k = 1; k < n; k++) if (d <= TM[k][1]) return TM[k - 1][0] + (d - TM[k - 1][1]) / (TM[k][1] - TM[k - 1][1]) * (TM[k][0] - TM[k - 1][0]);
+// histogram: drumchotic's tier on the reference's scale, each of the reference's human tiers marked at its median
+function histView() {
+  const R = REF();
+  return {key: R.scale, bin: refMode === 'rb' ? 0.5 : 0.25, cap: refMode === 'rb' ? 30 : 20, name: R.unit, marks: R.marks.map(([t, v]) => [R.prefix + t, v]),
+    toLevel: R.toLevel, label: `${R.unit} (dotted = typical ${R.humanKind} tier)`};
 }
 const HIST_EXAMPLES = 3;   // charts listed when hovering a histogram bar
-let scaleMode = 'd';
-try { scaleMode = localStorage.getItem('drumchotic-view') || 'd'; } catch (e) {}
-document.querySelectorAll('#scale button').forEach(b => b.onclick = () => {
-  scaleMode = b.dataset.v; try { localStorage.setItem('drumchotic-view', scaleMode); } catch (e) {}
-  drawHist(current);
-});
 function drawHist(sel) {
-  document.querySelectorAll('#scale button').forEach(b => b.classList.toggle('on', b.dataset.v === scaleMode));
-  const view = (HISTS[scaleMode] || HISTS.lv)(), raw = scaleMode === 'd', key = view.key, BIN = view.bin;
+  const view = histView(), key = view.key, BIN = view.bin;
   const svg = $('hist'), W = svg.clientWidth || 600, H = 300, m = {l: 44, r: 10, t: 40, b: 34};
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('height', H); svg.innerHTML = '';
-  const vals = ALL.map(key), lo = Math.min(0, Math.floor(Math.min(...vals))), hi = Math.min(Math.ceil(Math.max(...vals, raw ? 6 : 9)), view.cap ?? Infinity);
+  const vals = ALL.map(key), lo = Math.min(0, Math.floor(Math.min(...vals))), hi = Math.min(Math.ceil(Math.max(...vals, 9)), view.cap ?? Infinity);
   const nb = Math.ceil((hi - lo) / BIN), bin = v => Math.min(Math.floor((v - lo) / BIN), nb - 1);
   const all = new Array(nb).fill(0), got = new Array(nb).fill(0), members = Array.from({length: nb}, () => []);
   ALL.forEach(c => all[bin(key(c))]++);
@@ -362,8 +372,9 @@ function light(node, fill = false) {
   for (const [k, v] of Object.entries(set)) { node.dataset[k] = node.getAttribute(k) || 'none'; node.setAttribute(k, v); }
 }
 
-// model vs leaderboard
+// model vs leaderboard, both as tiers on the current reference
 let scatterPts = [];
+const lbTier = c => rawToTier(c.lb), hoTier = c => rawToTier(c.ho);
 // zoom and pan: wheel zooms about the cursor, drag pans, double-click resets; capped between the
 // full chart (1) and SCATTER_MAX_ZOOM, and the view never leaves the data
 const SCATTER_MAX_ZOOM = 12;
@@ -377,7 +388,7 @@ function drawScatter(sel) {
   const cv = $('scatter'), W = cv.clientWidth || 600, H = 300, dpr = devicePixelRatio || 1, m = {l: 44, r: 10, t: 10, b: 34};
   cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
   const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
-  const pool = ALL.filter(c => c.lb != null), lb = pool.map(c => c.lb), ho = pool.map(c => c.ho);
+  const pool = ALL.filter(c => c.lb != null), lb = pool.map(lbTier), ho = pool.map(hoTier);
   const lo = Math.floor(Math.min(...lb, ...ho)), hi = Math.ceil(Math.max(...lb, ...ho));
   const span = (hi - lo) / sview.zoom, half = span / 2;
   const clamp = v => Math.min(Math.max(v ?? (lo + hi) / 2, lo + half), hi - half);
@@ -393,26 +404,30 @@ function drawScatter(sel) {
   }
   g.textAlign = 'center';
   for (let v = Math.ceil(x0 / step) * step; v <= x0 + span + 1e-9; v += step) g.fillText(v.toFixed(digits), x(v), H - m.b + 16);
-  g.font = '12px system-ui'; g.fillText('leaderboard', (W + m.l) / 2, H - 4);
-  g.save(); g.translate(12, (H - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText('model (never saw the chart)', 0, 0); g.restore();
+  g.font = '12px system-ui'; g.fillText(`play (${REF().unit}), from players' scores`, (W + m.l) / 2, H - 4);
+  g.save(); g.translate(12, (H - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText(`note (${REF().unit}), from the notes`, 0, 0); g.restore();
   g.save(); g.beginPath(); g.rect(m.l, m.t, pw, ph); g.clip();
   g.setLineDash([4, 4]); g.strokeStyle = '#c3c2b7'; g.beginPath(); g.moveTo(x(lo), y(lo)); g.lineTo(x(hi), y(hi)); g.stroke(); g.setLineDash([]);
   const selSet = new Set(sel.map(c => c.i)), solo = sel.length < ALL.length;
-  g.fillStyle = solo ? '#c3c2b7' : ACCENT; g.globalAlpha = solo ? 0.12 : 0.35;
+  g.globalAlpha = solo ? 0.12 : 0.45;
   const dot = sview.zoom > 3 ? 4 : 3;   // bigger once zoomed in enough to tell charts apart
-  pool.forEach(c => { if (!solo || !selSet.has(c.i)) g.fillRect(x(c.lb) - dot / 2, y(c.ho) - dot / 2, dot, dot); });
+  // every dot in its notes tier's colour, so the cloud runs easy to hard bottom to top like the rest of the page
+  const colorAt = {}, dotColor = v => colorAt[v.toFixed(1)] ??= tierColor(+v.toFixed(1));
+  pool.forEach(c => { if (solo && selSet.has(c.i)) return;
+    g.fillStyle = solo ? '#c3c2b7' : dotColor(hoTier(c)); g.fillRect(x(lbTier(c)) - dot / 2, y(hoTier(c)) - dot / 2, dot, dot); });
   g.globalAlpha = 1;
   const inside = (px, py) => px >= m.l && px <= W - m.r && py >= m.t && py <= H - m.b;
   scatterPts = [];
-  if (solo) sel.forEach(c => { if (c.lb == null) return; const px = x(c.lb), py = y(c.ho);
+  if (solo) sel.forEach(c => { if (c.lb == null) return; const px = x(lbTier(c)), py = y(hoTier(c));
     g.beginPath(); g.arc(px, py, 4, 0, 7); g.fillStyle = levelColor(c.lv); g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1a19'; g.stroke();
     if (inside(px, py)) scatterPts.push([px, py, c]); });
-  else pool.forEach(c => { const px = x(c.lb), py = y(c.ho); if (inside(px, py)) scatterPts.push([px, py, c]); });
+  else pool.forEach(c => { const px = x(lbTier(c)), py = y(hoTier(c)); if (inside(px, py)) scatterPts.push([px, py, c]); });
   g.restore();
-  // above the diagonal the model rates a chart harder than its leaderboard, below it easier
-  g.font = '600 11px system-ui'; g.fillStyle = '#8a897f';
-  g.textAlign = 'left'; g.fillText('OVERESTIMATED', m.l + 10, m.t + 14);
-  g.textAlign = 'right'; g.fillText('UNDERESTIMATED', W - m.r - 6, H - m.b - 10);
+  // above the diagonal we rated a chart too hard, below it too easy
+  g.font = '600 11px system-ui';
+  g.textAlign = 'left'; g.fillStyle = cssVar('--easy'); g.fillText('RATED TOO HARD', m.l + 10, m.t + 14);
+  g.textAlign = 'right'; g.fillStyle = cssVar('--bad'); g.fillText('RATED TOO EASY', W - m.r - 6, H - m.b - 10);
+  g.fillStyle = '#8a897f';
   if (sview.zoom > 1) { g.textAlign = 'right'; g.fillText(`${sview.zoom.toFixed(1)}× · double-click to reset`, W - m.r - 6, m.t + 14); }
   const pick = sel.filter(c => c.lb != null), rho = spearman(pick.map(c => c.lb), pick.map(c => c.ho));
   $('sp').textContent = isNaN(rho) ? `${pick.length} on the leaderboard` : `spearman ${rho.toFixed(3)} over ${pick.length} leaderboard charts`;
@@ -430,7 +445,7 @@ function drawScatter(sel) {
     sview.zoom = zoom;
     sview.cx = dx - (mx - m.l) / pw * span + span / 2;
     sview.cy = dy - (H - m.b - my) / ph * span + span / 2;
-    hideTip(); $('sring').style.display = 'none'; drawScatter(current);
+    hideScatterMark(); drawScatter(current);
   }, {passive: false});
   let drag = null;
   cv.addEventListener('mousedown', e => { drag = {x: e.clientX, y: e.clientY, cx: sview.cx, cy: sview.cy}; cv.style.cursor = 'grabbing'; });
@@ -439,24 +454,50 @@ function drawScatter(sel) {
     const {pw, ph, span} = sgeo;
     sview.cx = drag.cx - (e.clientX - drag.x) / pw * span;
     sview.cy = drag.cy + (e.clientY - drag.y) / ph * span;
-    hideTip(); $('sring').style.display = 'none'; drawScatter(current);
+    hideScatterMark(); drawScatter(current);
   });
   addEventListener('mouseup', () => { if (drag) { drag = null; cv.style.cursor = ''; } });
   cv.addEventListener('dblclick', () => { sview.zoom = 1; sview.cx = sview.cy = null; drawScatter(current); });
 }
+// note minus play is our rating's error: below the line (negative) we rated it too easy, red, the miss that
+// catches players out; above it too hard, blue; muted within CLOSE_MISS
+const CLOSE_MISS = 0.5;
+const FEW_PLAYERS = 10;   // below this the play tier is noisy (about ±0.9 tier)
+const missColor = gap => Math.abs(gap) < CLOSE_MISS ? 'var(--ink-2)' : gap < 0 ? 'var(--bad)' : 'var(--easy)';
+function scatterTip(c) {
+  const R = REF(), notes = hoTier(c), plays = lbTier(c), gap = notes - plays, miss = Math.abs(gap);
+  const verdict = miss < 0.05 ? 'spot on' : `rated ${miss.toFixed(1)} too ${gap > 0 ? 'hard' : 'easy'}`;
+  const tier = (k, v, raw, after = '') => `<span class="k">${k}</span><span style="color:${tierColor(v)}">${rated(v)}</span>`
+    + `<span class="m">${topPct(raw)}</span><span class="k">${after}</span>`;
+  // below the line, everything else the chart's table row says: how humans ranked it, then its skills
+  const facts = [
+    c.tn.length && ['DMT', c.tn.map(([g, t]) => `tier ${t} · ${esc(g.replace(' Setlist', ''))}`).join('<br>')],
+    c.rb && ['Rock Band', `tier ${c.rb[0]} · ${esc(c.rb[1])}`],
+    c.r != null && ['charter', `diff ${c.r}`],
+    c.why.length && ['skills', c.why.map(i => AXES[i].replaceAll(' ', '&nbsp;')).join(', ')],   // wrap between skills only
+    c.ln <= -0.05 && ['length', `${lengthTiers(c).toFixed(1)}, long charts rate easier`],
+  ].filter(Boolean).map(([k, v]) => `<span class="k">${k}</span><span>${v}</span>`).join('');
+  return `<b>${esc(c.name)}</b><div class="rows">${tier('note', notes, c.ho)}`
+    + `${tier('play', plays, c.lb, `${c.n} players${c.n < FEW_PLAYERS ? ', few' : ''}`)}</div>`
+    + `<div class="miss" style="color:${missColor(gap)}">${verdict}</div>`
+    + (facts ? `<div class="facts">${facts}</div>` : '');
+}
+function hideScatterMark() { hideTip(); $('sring').style.display = $('sline').style.display = 'none'; }
 $('scatter').addEventListener('mousemove', e => {
   const b = e.target.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
   let best = null, bd = 100;
   for (const p of scatterPts) { const d = (p[0] - mx) ** 2 + (p[1] - my) ** 2; if (d < bd) { bd = d; best = p; } }
-  const ring = $('sring');
-  if (!best) { hideTip(); ring.style.display = 'none'; return; }
-  const [px, py, c] = best;
-  Object.assign(ring.style, {left: px + 'px', top: py + 'px', display: 'block'});
+  if (!best) { hideScatterMark(); return; }
+  const [px, py, c] = best, {H, m, ph, span, y0} = sgeo;
+  Object.assign($('sring').style, {left: px + 'px', top: py + 'px', background: tierColor(hoTier(c)), display: 'block'});
+  // the dashed line sits where notes equal plays, so the miss runs straight up or down to it
+  const ly = Math.min(Math.max(H - m.b - (lbTier(c) - y0) / span * ph, m.t), H - m.b);
+  Object.assign($('sline').style, {left: px + 'px', top: Math.min(py, ly) + 'px', height: Math.abs(py - ly) + 'px',
+    background: missColor(hoTier(c) - lbTier(c)), display: 'block'});
   const cb = $('scatter').getBoundingClientRect();
-  showTip(e, chartTip(c) + `<br><span class="m">leaderboard ${c.lb.toFixed(2)} · model ${c.ho.toFixed(2)}</span>`,
-          {left: cb.left + px - 8, right: cb.left + px + 8, top: cb.top + py - 12});
+  showTip(e, scatterTip(c), {left: cb.left + px - 8, right: cb.left + px + 8, top: cb.top + py - 12});
 });
-$('scatter').addEventListener('mouseleave', () => { hideTip(); $('sring').style.display = 'none'; });
+$('scatter').addEventListener('mouseleave', hideScatterMark);
 
 // tournaments: each human tier at its median drumchotic tier, as a grid or a dot chart
 const yearOf = g => +(g.match(/\b(20\d\d)\b/) || [0, 0])[1];
@@ -485,9 +526,8 @@ document.querySelectorAll('#tplace button').forEach(b => b.onclick = () => {
   drawTournaments();
 });
 function tourneyTip(e, chart, g, t, v, cs) {
-  const name = REF().name + ' tier';
-  const top3 = [...cs].sort((p, q) => q.n - p.n).slice(0, 3).map(c => `<br>${esc(c.name)} <span class="m">${name} ${tierOf(c).toFixed(1)}</span>`).join('');
-  showTip(e, `<b>${esc(g)}, ${REF().prefix}${t}</b> <span class="m">median drumchotic ${name} ${v.toFixed(1)},${cs.length} songs, most played:</span>${top3}`, chart);
+  const top3 = [...cs].sort((p, q) => q.n - p.n).slice(0, 3).map(c => `<br>${esc(c.name)} <span class="m">${rated(tierOf(c))}</span>`).join('');
+  showTip(e, `<b>${esc(g)}, tier ${t}</b> <span class="m">median drumchotic ${rated(v)}, ${cs.length} songs, most played:</span>${top3}`, chart);
 }
 function drawTournaments() {
   document.querySelectorAll('#tview button').forEach(b => b.classList.toggle('on', b.dataset.v === tview));
@@ -574,7 +614,7 @@ function drawAxes(sel) {
   for (let v = 0; v <= top; v += step) {
     el('line', {x1: x(v), x2: x(v), y1: m.t, y2: H - m.b, stroke: '#2c2c2a'}, svg);
     [m.t - 8, H - m.b + 16].forEach(ty => el('text', {x: x(v), y: ty, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 11}, svg).textContent = v + '%'); }
-  el('text', {x: W - 6, y: m.t - 8, 'text-anchor': 'end', fill: '#8a897f', 'font-size': 11}, svg).textContent = 'median';
+  el('text', {x: W - 6, y: m.t - 8, 'text-anchor': 'end', fill: '#8a897f', 'font-size': 11}, svg).textContent = 'typical';
   // band behind the hovered row, drawn first so the marks sit on top of it
   const band = el('rect', {x: 0, width: W, height: row, fill: '#f0efec', 'fill-opacity': 0.06, rx: 3, visibility: 'hidden'}, svg);
   const bars = {};
@@ -600,7 +640,7 @@ function drawAxes(sel) {
       svgMark(svg, W, H, s ? x(s[0]) : m.l, Math.max(s ? x(s[2]) : 0, x(libMed[a])) + 44, m.t + row * k));
   });
   hit.addEventListener('mouseleave', () => { hideTip(); band.setAttribute('visibility', 'hidden'); light(null); });
-  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "percent of each chart's difficulty from that axis (a chart's axes add up to 100%)";
+  el('text', {x: (W + m.l) / 2, y: H - 4, 'text-anchor': 'middle', fill: '#c3c2b7', 'font-size': 12}, svg).textContent = "share of each chart's difficulty (adds up to 100%)";
 }
 
 // table
@@ -610,12 +650,12 @@ const placedTiers = c => [...new Set(humanTiers(c).map(([, t]) => t))].sort((a, 
 const COLS = [
   ['#', null, 'n', ''],
   ['tier', c => c.lv, 'n', null],   // every reference's scale keeps the same order
-  ['diff', c => c.ch, 'n di', 'drumchotic: suggested song.ini diff, 0 to 6 (past 6 keeps counting)'],
+  ['top', c => c.d, 'n di', 'drumchotic: share of the library at least this hard'],
   ['tier', c => placedTiers(c)[0] ?? -1, 'n sep', null],
   ['diff', c => c.r ?? -1, 'n di', "human: what the chart's song.ini says"],
-  ['plays', c => c.n, 'n sep', 'scores on the leaderboard'],
+  ['players', c => c.n, 'n sep', 'players with a score on the leaderboard'],
   ['chart', c => c.low, 't', ''],
-  ['hard for', null, 'w', 'axes where this chart beats 85% of charts at its tier'],
+  ['skills', null, 'w', 'axes where this chart beats 85% of charts near its difficulty'],
 ];
 const CHART_COL = 6;
 let sortCol = 1, sortDir = -1;
@@ -640,11 +680,11 @@ function drawTable(all, more = false) {
   const key = COLS[sortCol][1], rows = key ? [...sel].sort((a, b) => { const p = key(a), q = key(b); return (p < q ? -1 : p > q ? 1 : 0) * sortDir; }) : sel;
   const groups = '<tr class="groups"><th></th><th colspan="2">drumchotic</th><th colspan="2" class="sep">human</th><th colspan="3" class="sep"></th></tr>';
   const R = REF(), helpOf = (help, k) => help ?? (k === 1 ? R.help : R.humanHelp);
-  const head = groups + '<tr>' + COLS.map(([n, , cls, help], k) => `<th class="${cls.replace(/\b[tw]\b/, '')}" data-k="${k}" title="${helpOf(help, k)}">${n}${k === sortCol ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('') + '</tr>';
+  const head = groups + '<tr>' + COLS.map(([n, , cls, help], k) => `<th class="${cls.replace(/\b[tw]\b/, '')}" data-k="${k}" title="${helpOf(help, k)}">${k === 1 ? R.unit : n}${k === sortCol ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('') + '</tr>';
   const body = rows.slice(0, rowsShown).map((c, k) => {
     const placed = placedTiers(c);
     return `<tr><td class="n">${k + 1}</td><td class="n" style="color:${levelColor(c.lv)}">${tierOf(c).toFixed(1)}</td>`
-      + `<td class="n di">${c.ch.toFixed(1)}</td>`
+      + `<td class="n di">${topPct(c.d).slice(4)}</td>`
       + `<td class="n sep" title="${esc(tierText(c))}" style="color:${placed.length ? tierColor(placed[0]) : 'inherit'}">${placed.length ? R.prefix + placed.join('/') : ''}</td>`
       + `<td class="n di">${c.r ?? ''}</td><td class="n sep">${c.n || ''}</td><td class="t">${esc(c.name)}</td>`
       + `<td class="w">${c.why.map(i => AXES[i]).join(', ')}</td></tr>`; }).join('');
@@ -654,10 +694,10 @@ function drawTable(all, more = false) {
   if (left > 0) moreRows.observe($('more'));
   $('table').querySelectorAll('th[data-k]').forEach(th => th.onclick = () => { const k = +th.dataset.k; if (!COLS[k][1]) return;
     sortDir = k === sortCol ? -sortDir : (k === CHART_COL ? 1 : -1); sortCol = k; drawTable(current); });
-  $('tcount').textContent = 'click a column to sort, hover a header for what it means';
+  $('tcount').textContent = 'click to sort, hover a header for help';
   $('spotseg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.i === +$('samples').value));
   $('thinval').textContent = every
-    ? `${sel.length} of ${all.length}: the most played of every ${Math.round(every)} charts in tier order`
+    ? `${sel.length} of ${all.length}: the most played of every ${Math.round(every)} charts in difficulty order`
     : all.length < ALL.length ? `showing all ${all.length} that match` : `showing all ${all.length}`;
 }
 function esc(s) { return s.replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
